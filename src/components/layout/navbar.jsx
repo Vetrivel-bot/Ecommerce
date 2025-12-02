@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   motion,
   AnimatePresence,
@@ -6,32 +6,28 @@ import {
   useMotionValueEvent,
 } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
+import { ThemeContext } from "@/context/ThemeContext"; // Ensure correct path
 
 const Navbar = () => {
+  const { theme, toggleTheme } = useContext(ThemeContext);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
-
-  // 1. Initialize as null so nothing is highlighted by default on "/"
   const [activeTab, setActiveTab] = useState(null);
 
-  // 2. Get current location
   const location = useLocation();
   const { scrollY } = useScroll();
 
-  // 3. Sync Active Tab with URL Hash
+  // Sync Active Tab with URL Hash
   useEffect(() => {
-    // If we are at root "/" with no hash, clear highlight
     if (!location.hash) {
       setActiveTab(null);
     } else {
-      // If there is a hash (e.g. #work), find the matching item name to highlight it
       const currentHash = location.hash.replace("#", "").toLowerCase();
       const items = ["Work", "About", "Playground", "Resource"];
       const matchingItem = items.find(
         (item) => item.toLowerCase() === currentHash
       );
-
       if (matchingItem) {
         setActiveTab(matchingItem);
       }
@@ -55,11 +51,7 @@ const Navbar = () => {
   const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
 
   useEffect(() => {
-    if (isSearchOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
+    document.body.style.overflow = isSearchOpen ? "hidden" : "unset";
   }, [isSearchOpen]);
 
   const navbarVariants = {
@@ -86,7 +78,12 @@ const Navbar = () => {
         <motion.nav
           layout
           transition={{ type: "spring", damping: 25, stiffness: 200 }}
-          className="bg-[#1a1a1a] p-2 rounded-[30px] shadow-2xl border border-gray-800/50 overflow-hidden backdrop-blur-md"
+          style={{
+            backgroundColor: theme.navbar.bg,
+            borderColor: theme.navbar.border,
+            boxShadow: theme.navbar.shadow,
+          }}
+          className="p-2 rounded-[30px] border overflow-hidden backdrop-blur-md transition-colors duration-300"
         >
           <div className="flex items-center justify-between pr-2 pl-2">
             {/* --- Left: Logo --- */}
@@ -95,8 +92,11 @@ const Navbar = () => {
                 layout="position"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                // Clicking logo goes to "/", which triggers useEffect to clear activeTab
-                className="bg-white text-black px-6 py-2.5 rounded-full text-sm font-bold hover:bg-gray-200 transition-colors shrink-0 z-20 cursor-pointer block"
+                style={{
+                  backgroundColor: theme.navbar.logoBg,
+                  color: theme.navbar.logoText,
+                }}
+                className="px-6 py-2.5 rounded-full text-sm font-bold transition-colors shrink-0 z-20 cursor-pointer block"
               >
                 ihyaet
               </motion.a>
@@ -109,11 +109,12 @@ const Navbar = () => {
             >
               {["Work", "About", "Playground", "Resource"].map((item) => (
                 <li key={item} className="relative z-0">
-                  {/* Highlight Pill (Only shows if activeTab is not null) */}
+                  {/* Highlight Pill */}
                   {activeTab === item && (
                     <motion.span
                       layoutId="active-pill"
-                      className="absolute inset-0 bg-white/10 rounded-full -z-10"
+                      style={{ backgroundColor: theme.navbar.activePill }}
+                      className="absolute inset-0 rounded-full -z-10"
                       transition={{
                         type: "spring",
                         stiffness: 300,
@@ -124,9 +125,8 @@ const Navbar = () => {
 
                   <FlipLink
                     href={`#${item.toLowerCase()}`}
-                    // We rely on the Link href changing the URL, and the useEffect updating the state.
-                    // But we can also set it immediately for a snappier feel.
                     onClick={() => setActiveTab(item)}
+                    theme={theme} // Pass theme to component
                   >
                     {item}
                   </FlipLink>
@@ -134,18 +134,46 @@ const Navbar = () => {
               ))}
             </motion.ul>
 
-            {/* --- Right: Desktop Search Trigger --- */}
+            {/* --- Right: Desktop Actions --- */}
             <motion.div
               layout="position"
-              className="hidden md:flex items-center"
+              className="hidden md:flex items-center gap-2"
             >
+              {/* Theme Toggle Button (Desktop) */}
+              <button
+                onClick={toggleTheme}
+                style={{
+                  backgroundColor: theme.navbar.searchBg,
+                  color: theme.navbar.iconColor,
+                }}
+                className="w-10 h-10 flex items-center justify-center rounded-full transition-colors hover:opacity-80"
+              >
+                {theme.name === "dark" ? <SunIcon /> : <MoonIcon />}
+              </button>
+
+              {/* Search Trigger */}
               <button
                 onClick={() => setIsSearchOpen(true)}
-                className="relative group flex items-center bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white pl-3 pr-4 py-2.5 rounded-full transition-all w-[160px] hover:w-[180px]"
+                style={{
+                  backgroundColor: theme.navbar.searchBg,
+                  color: theme.navbar.searchText,
+                  borderColor: theme.navbar.searchBorder,
+                }}
+                className="relative group flex items-center pl-3 pr-4 py-2.5 rounded-full transition-all w-[160px] hover:w-[180px] border"
               >
-                <SearchIcon className="h-4 w-4 mr-2" />
+                <SearchIcon
+                  className="h-4 w-4 mr-2"
+                  style={{ color: theme.navbar.iconColor }}
+                />
                 <span className="text-sm">Search...</span>
-                <span className="absolute right-3 text-xs bg-white/10 px-1.5 py-0.5 rounded text-gray-500 border border-white/5">
+                <span
+                  style={{
+                    backgroundColor: theme.navbar.searchBg,
+                    borderColor: theme.navbar.searchBorder,
+                    color: theme.navbar.textIdle,
+                  }}
+                  className="absolute right-3 text-xs px-1.5 py-0.5 rounded border"
+                >
                   ⌘K
                 </span>
               </button>
@@ -153,16 +181,36 @@ const Navbar = () => {
 
             {/* --- Mobile Right Section --- */}
             <div className="md:hidden flex items-center gap-3 z-20">
+              {/* Theme Toggle (Mobile) */}
+              <button
+                onClick={toggleTheme}
+                style={{
+                  backgroundColor: theme.navbar.searchBg,
+                  color: theme.navbar.iconColor,
+                }}
+                className="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
+              >
+                {theme.name === "dark" ? <SunIcon /> : <MoonIcon />}
+              </button>
+
               <button
                 onClick={() => setIsSearchOpen(true)}
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                style={{
+                  backgroundColor: theme.navbar.searchBg,
+                  color: theme.navbar.iconColor,
+                }}
+                className="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
               >
                 <SearchIcon className="h-5 w-5" />
               </button>
 
               <button
                 onClick={toggleMenu}
-                className="bg-white text-black w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
+                style={{
+                  backgroundColor: theme.navbar.logoBg,
+                  color: theme.navbar.logoText,
+                }}
+                className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
               >
                 <motion.div
                   animate={{ rotate: isMobileMenuOpen ? 90 : 0 }}
@@ -199,11 +247,13 @@ const Navbar = () => {
                               setActiveTab(item);
                               setIsMobileMenuOpen(false);
                             }}
-                            className={`${
-                              activeTab === item
-                                ? "text-white"
-                                : "text-gray-300"
-                            } text-xl font-medium block py-2 hover:text-white transition-colors`}
+                            style={{
+                              color:
+                                activeTab === item
+                                  ? theme.navbar.textHover
+                                  : theme.navbar.textIdle,
+                            }}
+                            className="text-xl font-medium block py-2 transition-colors"
                           >
                             {item}
                           </a>
@@ -221,7 +271,10 @@ const Navbar = () => {
       {/* --- Search Overview --- */}
       <AnimatePresence>
         {isSearchOpen && (
-          <SearchOverview onClose={() => setIsSearchOpen(false)} />
+          <SearchOverview
+            onClose={() => setIsSearchOpen(false)}
+            theme={theme}
+          />
         )}
       </AnimatePresence>
     </>
@@ -229,15 +282,17 @@ const Navbar = () => {
 };
 
 // --- SIMPLIFIED FlipLink Component ---
-const FlipLink = ({ children, href, onClick }) => {
+const FlipLink = ({ children, href, onClick, theme }) => {
   return (
     <motion.a
       initial="initial"
       whileHover="hovered"
       href={href}
       onClick={onClick}
-      className="relative block overflow-hidden whitespace-nowrap text-gray-300 text-sm font-medium px-4 py-2 hover:text-white transition-colors duration-200"
+      style={{ color: theme.navbar.textIdle }}
+      className="relative block overflow-hidden whitespace-nowrap text-sm font-medium px-4 py-2 transition-colors duration-200 hover:text-current"
     >
+      {/* Top Text: Slides Up + Fades OUT */}
       <motion.div
         variants={{
           initial: { y: 0, opacity: 1 },
@@ -247,8 +302,11 @@ const FlipLink = ({ children, href, onClick }) => {
       >
         {children}
       </motion.div>
+
+      {/* Bottom Text: Slides Up + Fades IN + Uses Active Color */}
       <motion.div
         className="absolute inset-0 flex items-center justify-center"
+        style={{ color: theme.navbar.textHover }}
         variants={{
           initial: { y: "100%", opacity: 0 },
           hovered: { y: 0, opacity: 1 },
@@ -262,7 +320,7 @@ const FlipLink = ({ children, href, onClick }) => {
 };
 
 // --- Search Overview Component ---
-const SearchOverview = ({ onClose }) => {
+const SearchOverview = ({ onClose, theme }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -284,7 +342,8 @@ const SearchOverview = ({ onClose }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-start justify-center pt-24 px-4"
+      style={{ backgroundColor: theme.navbar.modalOverlay }}
+      className="fixed inset-0 z-[60] backdrop-blur-sm flex items-start justify-center pt-24 px-4"
       onClick={handleManualClose}
     >
       <motion.div
@@ -292,11 +351,21 @@ const SearchOverview = ({ onClose }) => {
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.9, y: 20 }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="w-full max-w-2xl bg-[#1a1a1a] border border-gray-800 rounded-3xl overflow-hidden shadow-2xl"
+        style={{
+          backgroundColor: theme.navbar.modalBg,
+          borderColor: theme.navbar.border,
+        }}
+        className="w-full max-w-2xl border rounded-3xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-gray-800 p-4 flex items-center gap-4">
-          <SearchIcon className="h-6 w-6 text-gray-400" />
+        <div
+          className="border-b p-4 flex items-center gap-4"
+          style={{ borderColor: theme.navbar.border }}
+        >
+          <SearchIcon
+            className="h-6 w-6"
+            style={{ color: theme.navbar.textIdle }}
+          />
           <input
             autoFocus
             type="text"
@@ -304,11 +373,16 @@ const SearchOverview = ({ onClose }) => {
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search projects, resources, or commands..."
-            className="flex-1 bg-transparent text-xl text-white outline-none placeholder:text-gray-600 h-12"
+            style={{ color: theme.navbar.textHover }}
+            className="flex-1 bg-transparent text-xl outline-none placeholder:opacity-50 h-12"
           />
           <button
             onClick={handleManualClose}
-            className="p-2 bg-gray-800 hover:bg-red-500/20 hover:text-red-400 rounded-full text-gray-400 transition-colors"
+            style={{
+              backgroundColor: theme.navbar.searchBg,
+              color: theme.navbar.textIdle,
+            }}
+            className="p-2 rounded-full transition-colors hover:opacity-80"
           >
             <CloseIcon />
           </button>
@@ -317,7 +391,10 @@ const SearchOverview = ({ onClose }) => {
         <div className="p-4 max-h-[60vh] overflow-y-auto">
           {searchQuery === "" ? (
             <>
-              <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">
+              <p
+                className="text-xs font-semibold mb-3 uppercase tracking-wider"
+                style={{ color: theme.navbar.textIdle }}
+              >
                 Quick Links
               </p>
               <div className="space-y-1">
@@ -329,10 +406,11 @@ const SearchOverview = ({ onClose }) => {
                 ].map((item) => (
                   <button
                     key={item}
-                    className="w-full text-left px-4 py-3 hover:bg-white/5 rounded-xl text-gray-300 hover:text-white flex items-center justify-between group transition-colors"
+                    style={{ color: theme.navbar.textIdle }}
+                    className="w-full text-left px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl flex items-center justify-between group transition-colors"
                   >
-                    <span>{item}</span>
-                    <span className="text-gray-600 group-hover:text-gray-400">
+                    <span className="group-hover:text-current">{item}</span>
+                    <span className="opacity-50 group-hover:opacity-100">
                       ↵
                     </span>
                   </button>
@@ -340,7 +418,10 @@ const SearchOverview = ({ onClose }) => {
               </div>
             </>
           ) : (
-            <div className="text-center py-10 text-gray-500">
+            <div
+              className="text-center py-10"
+              style={{ color: theme.navbar.textIdle }}
+            >
               Searching for "{searchQuery}"...
             </div>
           )}
@@ -351,9 +432,11 @@ const SearchOverview = ({ onClose }) => {
 };
 
 // --- Icons ---
-const SearchIcon = ({ className }) => (
+
+const SearchIcon = ({ className, style }) => (
   <svg
     className={className}
+    style={style}
     fill="none"
     viewBox="0 0 24 24"
     stroke="currentColor"
@@ -397,6 +480,44 @@ const CloseIcon = () => (
   >
     <path d="M18 6 6 18" />
     <path d="m6 6 12 12" />
+  </svg>
+);
+
+const SunIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="5" />
+    <line x1="12" y1="1" x2="12" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="23" />
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+    <line x1="1" y1="12" x2="3" y2="12" />
+    <line x1="21" y1="12" x2="23" y2="12" />
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+  </svg>
+);
+
+const MoonIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
   </svg>
 );
 
