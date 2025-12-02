@@ -11,7 +11,7 @@ import {
   useMotionValue,
   useSpring,
 } from "framer-motion";
-import { useNavigate } from "react-router-dom"; // 1. Import useNavigate
+import { useNavigate } from "react-router-dom";
 import { ThemeContext } from "@/context/ThemeContext";
 import HeroCarousel from "@/components/home/HeroCarousel";
 import ProductCard from "@/components/ProductCard";
@@ -145,28 +145,31 @@ export default function Home() {
   const [currentSection, setCurrentSection] = useState(0);
   const [direction, setDirection] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
-  const navigate = useNavigate(); // 2. Initialize Hook
+  const navigate = useNavigate();
 
   // --- HORIZONTAL SCROLL LOGIC ---
   const productTrackRef = useRef(null);
   const horizontalX = useMotionValue(0);
-  // Adjusted spring physics for a "heavier/slower" feel
   const springX = useSpring(horizontalX, { stiffness: 150, damping: 25 });
 
-  // Refs to track values inside event listeners without re-rendering
   const sectionRef = useRef(0);
   const animatingRef = useRef(false);
   const xRef = useRef(0);
 
-  const TOTAL_SECTIONS = 3;
+  // 1. New Ref to accumulate scroll effort at the end of the page
+  const exitAccumulator = useRef(0);
 
-  // Helper to update horizontal value
+  const TOTAL_SECTIONS = 3;
+  // 2. Extra horizontal buffer (pixels) before switching sections
+  const HORIZONTAL_BUFFER = 400;
+  // 3. Extra vertical buffer (pixels) before navigating to /shop
+  const EXIT_THRESHOLD = 250;
+
   const updateHorizontal = (val) => {
     xRef.current = val;
     horizontalX.set(val);
   };
 
-  // Helper to trigger section switch
   const triggerSectionChange = useCallback(
     (nextSec, dir) => {
       animatingRef.current = true;
@@ -174,13 +177,14 @@ export default function Home() {
       setDirection(dir);
       setCurrentSection(nextSec);
       sectionRef.current = nextSec;
+      exitAccumulator.current = 0; // Reset accumulator on change
 
-      // Reset Horizontal position logic (Runs when entering section 1)
       if (nextSec === 1) {
         setTimeout(() => {
           const track = productTrackRef.current;
           const windowWidth = window.innerWidth;
           if (track) {
+            // Note: We don't subtract buffer here, we start at 0 or maxScroll
             const maxScroll = -(track.scrollWidth - windowWidth + 80);
             const startPos = dir === 1 ? 0 : maxScroll;
             updateHorizontal(startPos);
@@ -191,28 +195,37 @@ export default function Home() {
     [horizontalX]
   );
 
-  // Handle Scroll logic
   const handleScroll = useCallback(
     (event) => {
       if (animatingRef.current) return;
 
       const delta = event.deltaY;
-      if (Math.abs(delta) < 10) return;
+      if (Math.abs(delta) < 5) return; // Increased noise threshold
 
       // --- CASE 1: HERO (0) or FEATURED (2) ---
       if (sectionRef.current === 0 || sectionRef.current === 2) {
         if (delta > 0) {
-          // If we are NOT at the last section, go to next
           if (sectionRef.current < TOTAL_SECTIONS - 1) {
             triggerSectionChange(sectionRef.current + 1, 1);
           } else {
-            // 3. WE ARE AT THE LAST SECTION (2) AND SCROLLING DOWN
-            // Navigate to Shop
-            animatingRef.current = true; // Block further scrolls during nav
-            navigate("/shop");
+            // --- LOGIC: NAVIGATE TO SHOP (With Buffer) ---
+            // Instead of immediate nav, we add to accumulator
+            exitAccumulator.current += delta;
+
+            // Log for debugging if needed: console.log(exitAccumulator.current);
+
+            if (exitAccumulator.current > EXIT_THRESHOLD) {
+              animatingRef.current = true;
+              navigate("/shop");
+            }
           }
-        } else if (delta < 0 && sectionRef.current > 0) {
-          triggerSectionChange(sectionRef.current - 1, -1);
+        } else if (delta < 0) {
+          // Reset exit accumulator if user scrolls up
+          exitAccumulator.current = 0;
+
+          if (sectionRef.current > 0) {
+            triggerSectionChange(sectionRef.current - 1, -1);
+          }
         }
         return;
       }
@@ -224,12 +237,14 @@ export default function Home() {
 
         const trackWidth = track.scrollWidth;
         const windowWidth = window.innerWidth;
-        const maxScroll = -(trackWidth - windowWidth + 80);
+        // Logic max scroll (end of list)
+        const contentMaxScroll = -(trackWidth - windowWidth + 80);
+        // Actual trigger point (end of list + BUFFER)
+        const triggerPoint = contentMaxScroll - HORIZONTAL_BUFFER;
 
-        // --- SPEED ADJUSTMENT HERE ---
         let newX = xRef.current - delta * 0.7;
 
-        // 1. SCROLL UP PAST START -> GO TO HERO
+        // 1. SCROLL UP PAST START
         if (newX > 0) {
           if (xRef.current >= 0 && delta < 0) {
             triggerSectionChange(0, -1);
@@ -238,16 +253,16 @@ export default function Home() {
             updateHorizontal(newX);
           }
         }
-        // 2. SCROLL DOWN PAST END -> REWIND & EXIT SIMULTANEOUSLY
-        else if (newX < maxScroll) {
-          if (xRef.current <= maxScroll && delta > 0) {
-            // A: START REWIND (The spring will animate this back to 0)
-            updateHorizontal(0);
-
-            // B: IMMEDIATELY TRIGGER SECTION EXIT (No Timeout)
+        // 2. SCROLL DOWN PAST END (Buffer Zone)
+        else if (newX < contentMaxScroll) {
+          // We allow scrolling into the negative buffer
+          if (newX < triggerPoint) {
+            // If we hit the deep buffer, trigger change
+            // We reset X to contentMaxScroll so animation looks clean entering next section
+            updateHorizontal(contentMaxScroll);
             triggerSectionChange(2, 1);
           } else {
-            newX = maxScroll;
+            // Just update X (This allows the "Empty Scroll" visual)
             updateHorizontal(newX);
           }
         }
@@ -257,7 +272,7 @@ export default function Home() {
         }
       }
     },
-    [triggerSectionChange, navigate] // Added navigate to dependency array
+    [triggerSectionChange, navigate]
   );
 
   useEffect(() => {
@@ -265,6 +280,8 @@ export default function Home() {
       const timeout = setTimeout(() => {
         setIsAnimating(false);
         animatingRef.current = false;
+        // Ensure accumulator is reset after animations finish
+        exitAccumulator.current = 0;
       }, 1000);
       return () => clearTimeout(timeout);
     }
@@ -344,9 +361,12 @@ export default function Home() {
                     <ProductCard {...product} />
                   </div>
                 ))}
-                {/* Visual Cue at the end */}
-                <div className="w-[20vw] flex-shrink-0 flex items-center justify-center opacity-50 font-mono text-xl">
-                  NEXT SECTION &rarr;
+                {/* Visual Cue at the end - Adjusted spacing for buffer */}
+                <div
+                  className="flex-shrink-0 flex items-center justify-center opacity-50 font-mono text-xl"
+                  style={{ width: "300px", paddingLeft: "50px" }}
+                >
+                  KEEP SCROLLING &rarr;
                 </div>
               </motion.div>
             </div>
@@ -362,7 +382,7 @@ export default function Home() {
             initial="initial"
             animate="animate"
             exit="exit"
-            className="absolute  inset-0 w-full h-full flex items-center justify-center px-4 md:px-10 z-10"
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center px-4 md:px-10 z-10"
           >
             <div className="w-full mt-[90px] max-w-6xl h-[70vh] rounded-3xl border-2 border-dashed border-gray-700/50 flex items-center justify-center bg-white/5 backdrop-blur-sm relative overflow-hidden group">
               <div className="absolute inset-0">
@@ -373,6 +393,7 @@ export default function Home() {
                 />
                 <div className="absolute inset-0 bg-black/50" />
               </div>
+
               <div className="text-center relative z-10">
                 <h2 className="text-5xl md:text-8xl font-black uppercase mb-4 drop-shadow-2xl">
                   Featured
@@ -383,13 +404,28 @@ export default function Home() {
                   [ The Urban Explorer Series ]
                 </p>
                 <button
-                  onClick={() => navigate("/shop")} // Added helper click event
+                  onClick={() => navigate("/shop")}
                   className="px-10 py-4 bg-white text-black font-bold text-lg rounded-full hover:scale-105 transition-transform"
                 >
                   Discover Now
                 </button>
               </div>
             </div>
+
+            {/* 👇 scroll hint */}
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                delay: 0.3,
+                duration: 1,
+                repeat: Infinity,
+                repeatType: "mirror",
+              }}
+              className="mt-6 text-sm text-white/60 tracking-widest font-light uppercase"
+            >
+              ↓ Scroll down to shop more ↓
+            </motion.p>
           </motion.section>
         )}
       </AnimatePresence>

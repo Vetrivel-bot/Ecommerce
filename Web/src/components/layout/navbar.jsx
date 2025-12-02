@@ -8,6 +8,14 @@ import {
 import { Link, useLocation } from "react-router-dom";
 import { ThemeContext } from "@/context/ThemeContext"; // Ensure correct path
 
+// --- UNIFIED ROUTES CONFIGURATION ---
+const ROUTES = [
+  { name: "Shop", path: "/shop" },
+  { name: "About", path: "/about" },
+  { name: "Playground", path: "/playground" },
+  { name: "Resource", path: "/resource" },
+];
+
 const Navbar = () => {
   const { theme, toggleTheme } = useContext(ThemeContext);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -15,22 +23,31 @@ const Navbar = () => {
   const [isHidden, setIsHidden] = useState(false);
   const [activeTab, setActiveTab] = useState(null);
 
+  // 1. New state to track initial load reveal
+  const [isRevealed, setIsRevealed] = useState(false);
+
   const location = useLocation();
   const { scrollY } = useScroll();
 
-  // Sync Active Tab with URL Hash
+  // 2. Effect to reveal navbar after 3 seconds
   useEffect(() => {
-    if (!location.hash) {
-      setActiveTab(null);
+    const timer = setTimeout(() => {
+      setIsRevealed(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // --- Sync Active Tab with URL Path ---
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const matchingRoute = ROUTES.find((route) =>
+      currentPath.startsWith(route.path)
+    );
+
+    if (matchingRoute) {
+      setActiveTab(matchingRoute.name);
     } else {
-      const currentHash = location.hash.replace("#", "").toLowerCase();
-      const items = ["Work", "About", "Playground", "Resource"];
-      const matchingItem = items.find(
-        (item) => item.toLowerCase() === currentHash
-      );
-      if (matchingItem) {
-        setActiveTab(matchingItem);
-      }
+      setActiveTab(null);
     }
   }, [location]);
 
@@ -72,8 +89,10 @@ const Navbar = () => {
     <>
       <motion.div
         variants={navbarVariants}
-        animate={isHidden ? "hidden" : "visible"}
-        initial="visible"
+        // 3. Logic: If NOT revealed yet OR scroll says hidden -> hide. Otherwise -> visible.
+        animate={!isRevealed || isHidden ? "hidden" : "visible"}
+        // 4. Start hidden
+        initial="hidden"
         className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-[1000px]"
       >
         <motion.nav
@@ -82,7 +101,6 @@ const Navbar = () => {
           style={{
             backgroundColor: theme.navbar.bg,
             borderColor: theme.navbar.border,
-            // --- SHADOW APPLIED HERE ---
             boxShadow: theme.navbar.shadow,
           }}
           className="p-2 rounded-[30px] border overflow-hidden backdrop-blur-md transition-shadow duration-300"
@@ -90,7 +108,7 @@ const Navbar = () => {
           <div className="flex items-center justify-between pr-2 pl-2">
             {/* --- Left: Logo --- */}
             <Link to="/">
-              <motion.a
+              <motion.div
                 layout="position"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -101,7 +119,7 @@ const Navbar = () => {
                 className="px-6 py-2.5 rounded-full text-sm font-bold transition-colors shrink-0 z-20 cursor-pointer block"
               >
                 ihyaet
-              </motion.a>
+              </motion.div>
             </Link>
 
             {/* --- Center: Desktop Links --- */}
@@ -109,10 +127,10 @@ const Navbar = () => {
               layout="position"
               className="hidden md:flex items-center gap-2 lg:gap-2 px-4"
             >
-              {["Work", "About", "Playground", "Resource"].map((item) => (
-                <li key={item} className="relative z-0">
+              {ROUTES.map((route) => (
+                <li key={route.name} className="relative z-0">
                   {/* Highlight Pill */}
-                  {activeTab === item && (
+                  {activeTab === route.name && (
                     <motion.span
                       layoutId="active-pill"
                       style={{ backgroundColor: theme.navbar.activePill }}
@@ -126,11 +144,11 @@ const Navbar = () => {
                   )}
 
                   <FlipLink
-                    href={`#${item.toLowerCase()}`}
-                    onClick={() => setActiveTab(item)}
+                    to={route.path}
+                    onClick={() => setActiveTab(route.name)}
                     theme={theme}
                   >
-                    {item}
+                    {route.name}
                   </FlipLink>
                 </li>
               ))}
@@ -176,7 +194,7 @@ const Navbar = () => {
                   }}
                   className="absolute right-3 text-xs px-1.5 py-0.5 rounded border"
                 >
-                  ⌘K
+                  Ask AI
                 </span>
               </button>
             </motion.div>
@@ -235,33 +253,31 @@ const Navbar = () => {
               >
                 <div className="p-4 flex flex-col gap-6">
                   <ul className="flex flex-col gap-2 text-center">
-                    {["Work", "About", "Playground", "Resource"].map(
-                      (item, i) => (
-                        <motion.li
-                          key={item}
-                          initial={{ x: -20, opacity: 0 }}
-                          animate={{ x: 0, opacity: 1 }}
-                          transition={{ delay: 0.1 + i * 0.1 }}
+                    {ROUTES.map((route, i) => (
+                      <motion.li
+                        key={route.name}
+                        initial={{ x: -20, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        transition={{ delay: 0.1 + i * 0.1 }}
+                      >
+                        <Link
+                          to={route.path}
+                          onClick={() => {
+                            setActiveTab(route.name);
+                            setIsMobileMenuOpen(false);
+                          }}
+                          style={{
+                            color:
+                              activeTab === route.name
+                                ? theme.navbar.textHover
+                                : theme.navbar.textIdle,
+                          }}
+                          className="text-xl font-medium block py-2 transition-colors"
                         >
-                          <a
-                            href={`#${item.toLowerCase()}`}
-                            onClick={() => {
-                              setActiveTab(item);
-                              setIsMobileMenuOpen(false);
-                            }}
-                            style={{
-                              color:
-                                activeTab === item
-                                  ? theme.navbar.textHover
-                                  : theme.navbar.textIdle,
-                            }}
-                            className="text-xl font-medium block py-2 transition-colors"
-                          >
-                            {item}
-                          </a>
-                        </motion.li>
-                      )
-                    )}
+                          {route.name}
+                        </Link>
+                      </motion.li>
+                    ))}
                   </ul>
                 </div>
               </motion.div>
@@ -284,12 +300,15 @@ const Navbar = () => {
 };
 
 // --- SIMPLIFIED FlipLink Component ---
-const FlipLink = ({ children, href, onClick, theme }) => {
+// Wraps Link in motion() to allow framer-motion props + react-router navigation
+const MotionLink = motion(Link);
+
+const FlipLink = ({ children, to, onClick, theme }) => {
   return (
-    <motion.a
+    <MotionLink
       initial="initial"
       whileHover="hovered"
-      href={href}
+      to={to}
       onClick={onClick}
       style={{ color: theme.navbar.textIdle }}
       className="relative block overflow-hidden whitespace-nowrap text-sm font-medium px-4 py-2 transition-colors duration-200 hover:text-current"
@@ -317,7 +336,7 @@ const FlipLink = ({ children, href, onClick, theme }) => {
       >
         {children}
       </motion.div>
-    </motion.a>
+    </MotionLink>
   );
 };
 
@@ -356,7 +375,7 @@ const SearchOverview = ({ onClose, theme }) => {
         style={{
           backgroundColor: theme.navbar.modalBg,
           borderColor: theme.navbar.border,
-          boxShadow: theme.navbar.shadow, // Use theme shadow here too
+          boxShadow: theme.navbar.shadow,
         }}
         className="w-full max-w-2xl border rounded-3xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
