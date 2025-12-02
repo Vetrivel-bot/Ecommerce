@@ -34,6 +34,7 @@ const Navbar = () => {
     }
   }, [location]);
 
+  // Scroll Hide/Show Logic
   useMotionValueEvent(scrollY, "change", (latest) => {
     const previous = scrollY.getPrevious();
     if (
@@ -81,9 +82,10 @@ const Navbar = () => {
           style={{
             backgroundColor: theme.navbar.bg,
             borderColor: theme.navbar.border,
+            // --- SHADOW APPLIED HERE ---
             boxShadow: theme.navbar.shadow,
           }}
-          className="p-2 rounded-[30px] border overflow-hidden backdrop-blur-md transition-colors duration-300"
+          className="p-2 rounded-[30px] border overflow-hidden backdrop-blur-md transition-shadow duration-300"
         >
           <div className="flex items-center justify-between pr-2 pl-2">
             {/* --- Left: Logo --- */}
@@ -126,7 +128,7 @@ const Navbar = () => {
                   <FlipLink
                     href={`#${item.toLowerCase()}`}
                     onClick={() => setActiveTab(item)}
-                    theme={theme} // Pass theme to component
+                    theme={theme}
                   >
                     {item}
                   </FlipLink>
@@ -354,8 +356,9 @@ const SearchOverview = ({ onClose, theme }) => {
         style={{
           backgroundColor: theme.navbar.modalBg,
           borderColor: theme.navbar.border,
+          boxShadow: theme.navbar.shadow, // Use theme shadow here too
         }}
-        className="w-full max-w-2xl border rounded-3xl overflow-hidden shadow-2xl"
+        className="w-full max-w-2xl border rounded-3xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div
@@ -431,7 +434,7 @@ const SearchOverview = ({ onClose, theme }) => {
   );
 };
 
-// --- Icons ---
+// --- Icons (Unchanged) ---
 
 const SearchIcon = ({ className, style }) => (
   <svg
