@@ -3,10 +3,12 @@ import { useContext, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Shop from "./pages/Shop";
-import ScrollToTop from "./components/ScrollToTop";
+import ScrollToTopButton from "./components/ScrollToTopButton";
 import Footer from "./components/layout/footer";
 import Navbar from "./components/layout/navbar"; // Ensure this path matches your file structure
 import { ThemeContext } from "./context/ThemeContext";
+import ProductDisplay from "./components/ProductDisplay";
+import ScrollToTop from "./components/ScrollToTop";
 function App() {
   const { theme } = useContext(ThemeContext);
   useEffect(() => {
@@ -18,6 +20,7 @@ function App() {
     <>
       <Navbar />
       <ScrollToTop />
+      <ScrollToTopButton />
       <div
         style={{
           paddingTop: "90px",
@@ -27,6 +30,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/shop" element={<Shop />} />
+          <Route path="/shop/:id" element={<ProductDisplay />} />
         </Routes>
       </div>
       <Footer />
