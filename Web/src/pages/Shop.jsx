@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { ThemeContext } from "../context/ThemeContext";
 import ProductCard from "../components/ProductCard";
+import { Link } from "react-router-dom";
 
 // --- 1. CONFIGURATION & MOCK DATA ---
 
@@ -804,14 +805,16 @@ const Shop = () => {
                   exit="exit"
                   className="w-full"
                 >
-                  <ProductCard
-                    title={product.title}
-                    price={product.price}
-                    category={product.category}
-                    image1={product.image1}
-                    image2={product.image2}
-                    badge={product.badge}
-                  />
+                  <Link to={`/shop/${product.id}`}>
+                    <ProductCard
+                      title={product.title}
+                      price={product.price}
+                      category={product.category}
+                      image1={product.image1}
+                      image2={product.image2}
+                      badge={product.badge}
+                    />{" "}
+                  </Link>
                 </motion.div>
               ))}
             </motion.div>

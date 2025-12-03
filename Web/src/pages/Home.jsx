@@ -11,7 +11,7 @@ import {
   useMotionValue,
   useSpring,
 } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ThemeContext } from "@/context/ThemeContext";
 import HeroCarousel from "@/components/home/HeroCarousel";
 import ProductCard from "@/components/ProductCard";
@@ -449,12 +449,13 @@ export default function Home() {
                 className="flex gap-8 pl-10 pr-20"
               >
                 {PRODUCTS.map((product) => (
-                  <div
+                  <Link
+                    to={`/shop/${product.id}`}
                     key={product.id}
                     className="w-[300px] md:w-[300px] flex-shrink-0"
                   >
                     <ProductCard {...product} />
-                  </div>
+                  </Link>
                 ))}
                 {/* Visual Cue at the end */}
                 <div
