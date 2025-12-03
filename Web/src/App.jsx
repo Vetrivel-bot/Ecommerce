@@ -4,6 +4,7 @@ import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Shop from "./pages/Shop";
 import ScrollToTop from "./components/ScrollToTop";
+import Footer from "./components/layout/footer";
 import Navbar from "./components/layout/navbar"; // Ensure this path matches your file structure
 import { ThemeContext } from "./context/ThemeContext";
 function App() {
@@ -28,6 +29,7 @@ function App() {
           <Route path="/shop" element={<Shop />} />
         </Routes>
       </div>
+      <Footer />
     </>
   );
 }
