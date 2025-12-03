@@ -13,7 +13,7 @@ import UserHeader from "./UserHeader";
 const ROUTES = [
   { name: "Shop", path: "/shop" },
   { name: "Gallery", path: "/gallery" },
-  { name: "Resource", path: "/resource" },
+  { name: "Contact", path: "/contact" },
   { name: "About", path: "/about" },
 ];
 

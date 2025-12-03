@@ -10,6 +10,10 @@ import { ThemeContext } from "./context/ThemeContext";
 import ProductDisplay from "./components/ProductDisplay";
 import ScrollToTop from "./components/ScrollToTop";
 import Gallery from "./pages/Gallery";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
+import Cart from "./pages/Cart";
+import Profile from "./pages/Profile";
 function App() {
   const { theme } = useContext(ThemeContext);
   useEffect(() => {
@@ -33,6 +37,10 @@ function App() {
           <Route path="/shop" element={<Shop />} />
           <Route path="/shop/:id" element={<ProductDisplay />} />
           <Route path="/gallery" element={<Gallery />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </div>
       <Footer />
