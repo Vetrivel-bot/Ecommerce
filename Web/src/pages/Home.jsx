@@ -10,6 +10,7 @@ import {
   AnimatePresence,
   useMotionValue,
   useSpring,
+  useTransform,
 } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { ThemeContext } from "@/context/ThemeContext";
@@ -140,31 +141,104 @@ const sectionVariants = {
   }),
 };
 
+// --- CAROUSEL ITEM COMPONENT ---
+const CarouselItem = ({ product, index, x, isClickBlockedRef }) => {
+  const CARD_WIDTH = 300;
+  const GAP = 32;
+  const ITEM_STRIDE = CARD_WIDTH + GAP;
+  const itemOffset = index * ITEM_STRIDE;
+  const dynamicPos = useTransform(x, (latest) => latest + itemOffset);
+
+  const scale = useTransform(
+    dynamicPos,
+    [-ITEM_STRIDE, 0, ITEM_STRIDE],
+    [0.85, 1.1, 0.85]
+  );
+  const opacity = useTransform(
+    dynamicPos,
+    [-ITEM_STRIDE, 0, ITEM_STRIDE],
+    [0.5, 1, 0.5]
+  );
+  const blurValue = useTransform(
+    dynamicPos,
+    [-ITEM_STRIDE, 0, ITEM_STRIDE],
+    [3, 0, 3]
+  );
+  const blurFilter = useTransform(blurValue, (v) => `blur(${v}px)`);
+  const zIndex = useTransform(dynamicPos, (val) => {
+    return Math.abs(val) < ITEM_STRIDE / 2 ? 10 : 1;
+  });
+
+  return (
+    <motion.div
+      style={{
+        width: CARD_WIDTH,
+        scale,
+        opacity,
+        filter: blurFilter,
+        zIndex,
+      }}
+      className="flex-shrink-0 relative transition-colors duration-300"
+    >
+      <motion.div
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+        // IMPORTANT: Prevent default drag behavior to avoid ghost image
+        onDragStart={(e) => e.preventDefault()}
+        className="w-full h-full block"
+      >
+        <Link
+          to={`/shop/${product.id}`}
+          className="block w-full h-full"
+          draggable={false}
+          onClick={(e) => {
+            if (isClickBlockedRef.current) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <ProductCard {...product} />
+        </Link>
+      </motion.div>
+    </motion.div>
+  );
+};
+
 export default function Home() {
   const { theme } = useContext(ThemeContext);
   const [currentSection, setCurrentSection] = useState(0);
   const [direction, setDirection] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+
+  // ZOOM STATE: 'idle' or 'full' (zooming in)
+  const [isZooming, setIsZooming] = useState(false);
   const navigate = useNavigate();
 
   // --- HORIZONTAL SCROLL LOGIC ---
   const productTrackRef = useRef(null);
   const horizontalX = useMotionValue(0);
-  const springX = useSpring(horizontalX, { stiffness: 150, damping: 25 });
+  const springX = useSpring(horizontalX, { stiffness: 120, damping: 20 });
+
+  // --- TEXT ANIMATION ---
+  const textX = useTransform(springX, [0, -400], [0, -300]);
+  const textOpacity = useTransform(springX, [0, -200], [1, 0]);
+  const textBlur = useTransform(springX, [0, -200], [0, 20]);
+  const textBlurFilter = useTransform(textBlur, (v) => `blur(${v}px)`);
 
   const sectionRef = useRef(0);
   const animatingRef = useRef(false);
   const xRef = useRef(0);
   const exitAccumulator = useRef(0);
 
-  // --- TOUCH & DRAG STATE ---
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
   const isMouseDragging = useRef(false);
+  const isClickBlocked = useRef(false);
 
   const TOTAL_SECTIONS = 3;
-  const HORIZONTAL_BUFFER = 400;
-  const EXIT_THRESHOLD = 250;
+  const HORIZONTAL_BUFFER = 200;
+  const EXIT_THRESHOLD = 350; // Require noticeable scroll to trigger zoom
 
   const updateHorizontal = (val) => {
     xRef.current = val;
@@ -182,34 +256,26 @@ export default function Home() {
 
       if (nextSec === 1) {
         setTimeout(() => {
-          const track = productTrackRef.current;
-          const windowWidth = window.innerWidth;
-          if (track) {
-            const maxScroll = -(track.scrollWidth - windowWidth + 80);
-            const startPos = dir === 1 ? 0 : maxScroll;
-            updateHorizontal(startPos);
-          }
+          updateHorizontal(0);
         }, 100);
       }
     },
     [horizontalX]
   );
 
-  // --- UNIFIED SCROLL PROCESSOR ---
   const processScroll = useCallback(
-    (delta, sensitivity = 0.7) => {
+    (delta, sensitivity = 0.8) => {
       if (animatingRef.current) return;
 
-      // --- CASE 1: HERO (0) or FEATURED (2) ---
       if (sectionRef.current === 0 || sectionRef.current === 2) {
         if (delta > 0) {
           if (sectionRef.current < TOTAL_SECTIONS - 1) {
             triggerSectionChange(sectionRef.current + 1, 1);
           } else {
+            // --- SECTION 2 END LOGIC: TRIGGER ZOOM ---
             exitAccumulator.current += delta;
-            if (exitAccumulator.current > EXIT_THRESHOLD) {
-              animatingRef.current = true;
-              navigate("/shop");
+            if (exitAccumulator.current > EXIT_THRESHOLD && !isZooming) {
+              setIsZooming(true);
             }
           }
         } else if (delta < 0) {
@@ -221,51 +287,50 @@ export default function Home() {
         return;
       }
 
-      // --- CASE 2: TRENDING PRODUCTS (1) ---
       if (sectionRef.current === 1) {
         const track = productTrackRef.current;
         if (!track) return;
 
-        const trackWidth = track.scrollWidth;
-        const windowWidth = window.innerWidth;
-        const contentMaxScroll = -(trackWidth - windowWidth + 80);
+        const trackScrollWidth = track.scrollWidth;
+        const contentMaxScroll = -(trackScrollWidth - window.innerWidth);
         const triggerPoint = contentMaxScroll - HORIZONTAL_BUFFER;
 
         let newX = xRef.current - delta * sensitivity;
 
-        // 1. SCROLL UP PAST START
-        if (newX > 0) {
-          if (xRef.current >= 0 && delta < 0) {
+        if (newX > 150) {
+          if (delta < 0) {
             triggerSectionChange(0, -1);
           } else {
-            newX = 0;
-            updateHorizontal(newX);
+            updateHorizontal(150);
           }
-        }
-        // 2. SCROLL DOWN PAST END
-        else if (newX < contentMaxScroll) {
-          if (newX < triggerPoint) {
-            updateHorizontal(0); // Rewind
-            triggerSectionChange(2, 1);
-          } else {
-            updateHorizontal(newX);
-          }
-        }
-        // 3. NORMAL SCROLL
-        else {
+        } else if (newX < contentMaxScroll - 150) {
+          triggerSectionChange(2, 1);
+        } else {
           updateHorizontal(newX);
         }
       }
     },
-    [triggerSectionChange, navigate]
+    [triggerSectionChange, isZooming]
   );
 
-  // --- MOUSE DRAG HANDLERS ---
+  // --- NAVIGATE AFTER ZOOM COMPLETES ---
+  useEffect(() => {
+    if (isZooming) {
+      // Wait for the zoom animation (0.8s) then navigate
+      const timeout = setTimeout(() => {
+        // Navigate and pass state to indicate we are coming from a zoom
+        navigate("/shop", { state: { fromZoom: true } });
+      }, 800);
+      return () => clearTimeout(timeout);
+    }
+  }, [isZooming, navigate]);
+
   const handleMouseDown = useCallback((e) => {
     if (sectionRef.current === 1) {
       isMouseDragging.current = true;
       touchStartX.current = e.clientX;
       document.body.style.cursor = "grabbing";
+      isClickBlocked.current = false;
     }
   }, []);
 
@@ -273,31 +338,33 @@ export default function Home() {
     (e) => {
       if (!isMouseDragging.current) return;
       e.preventDefault();
-      const currentX = e.clientX;
-      const deltaX = touchStartX.current - currentX;
+      const deltaX = touchStartX.current - e.clientX;
+
       if (Math.abs(deltaX) > 0) {
         processScroll(deltaX, 1.5);
-        touchStartX.current = currentX;
+        touchStartX.current = e.clientX;
+
+        if (Math.abs(deltaX) > 5 || Math.abs(xRef.current) > 5) {
+          isClickBlocked.current = true;
+        }
       }
     },
     [processScroll]
   );
 
   const handleMouseUpDrag = useCallback(() => {
-    if (isMouseDragging.current) {
-      isMouseDragging.current = false;
-      document.body.style.cursor = "";
-    }
+    isMouseDragging.current = false;
+    document.body.style.cursor = "";
+    setTimeout(() => {
+      isClickBlocked.current = false;
+    }, 100);
   }, []);
 
-  // --- GLOBAL SCROLL HANDLERS ---
   const handleWheel = useCallback(
     (event) => {
-      // 1. Prevent default to stop browser elastic scrolling/jitter
       event.preventDefault();
-
-      if (Math.abs(event.deltaY) < 5) return;
-      processScroll(event.deltaY, 0.7);
+      if (Math.abs(event.deltaY) < 2) return;
+      processScroll(event.deltaY, 0.9);
     },
     [processScroll]
   );
@@ -305,55 +372,28 @@ export default function Home() {
   const handleTouchStart = useCallback((event) => {
     touchStartY.current = event.touches[0].clientY;
     touchStartX.current = event.touches[0].clientX;
+    isClickBlocked.current = false;
   }, []);
 
   const handleTouchMove = useCallback(
     (event) => {
-      event.preventDefault(); // Stop native scrolling
-      const touchY = event.touches[0].clientY;
-      const touchX = event.touches[0].clientX;
-      const deltaY = touchStartY.current - touchY;
-      const deltaX = touchStartX.current - touchX;
+      event.preventDefault();
+      const deltaY = touchStartY.current - event.touches[0].clientY;
+      const deltaX = touchStartX.current - event.touches[0].clientX;
 
-      // --- LOGIC FOR SECTION 1 (TRENDING) ---
       if (sectionRef.current === 1) {
-        const track = productTrackRef.current;
-        const trackWidth = track ? track.scrollWidth : 0;
-        const windowWidth = window.innerWidth;
-        const contentMaxScroll = -(trackWidth - windowWidth + 80);
-
-        // A. Horizontal Swipe: Always move the slider
-        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 5) {
-          processScroll(deltaX, 2.0);
-          touchStartX.current = touchX;
-          touchStartY.current = touchY;
+        if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+          isClickBlocked.current = true;
         }
-        // B. Vertical Swipe: LOCK MOVEMENT, only trigger transition at edges
-        else if (Math.abs(deltaY) > 5) {
-          // If at START and Swiping DOWN (negative deltaY) -> Go to Prev Section
-          if (xRef.current >= 0 && deltaY < 0) {
-            processScroll(deltaY, 2.0);
-          }
-          // If at END and Swiping UP (positive deltaY) -> Go to Next Section
-          else if (xRef.current <= contentMaxScroll && deltaY > 0) {
-            processScroll(deltaY, 2.0);
-          }
-          // ELSE: Do nothing (Strictly ignore vertical swipes inside the list)
-
-          // Reset touches so delta doesn't accumulate huge values while ignored
-          touchStartY.current = touchY;
-          touchStartX.current = touchX;
-        }
+        const dominantDelta =
+          Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+        processScroll(dominantDelta, 2.0);
+      } else {
+        processScroll(deltaY, 2.0);
       }
-      // --- LOGIC FOR OTHER SECTIONS (Vertical Scroll) ---
-      else {
-        // Standard vertical scrolling behavior for Hero/Featured
-        if (Math.abs(deltaY) > 5) {
-          processScroll(deltaY, 2.0);
-          touchStartY.current = touchY;
-          touchStartX.current = touchX;
-        }
-      }
+
+      touchStartY.current = event.touches[0].clientY;
+      touchStartX.current = event.touches[0].clientX;
     },
     [processScroll]
   );
@@ -370,11 +410,9 @@ export default function Home() {
   }, [currentSection, isAnimating]);
 
   useEffect(() => {
-    // Note: Passive false is critical for event.preventDefault() to work
     window.addEventListener("wheel", handleWheel, { passive: false });
     window.addEventListener("touchstart", handleTouchStart, { passive: false });
     window.addEventListener("touchmove", handleTouchMove, { passive: false });
-
     return () => {
       window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("touchstart", handleTouchStart);
@@ -391,7 +429,7 @@ export default function Home() {
       }}
     >
       <AnimatePresence mode="wait" initial={false} custom={direction}>
-        {/* --- SECTION 0: HERO CAROUSEL --- */}
+        {/* --- HERO --- */}
         {currentSection === 0 && (
           <motion.section
             key="hero"
@@ -406,7 +444,7 @@ export default function Home() {
           </motion.section>
         )}
 
-        {/* --- SECTION 1: TRENDING PRODUCTS --- */}
+        {/* --- TRENDING (Horizontal) --- */}
         {currentSection === 1 && (
           <motion.section
             key="trending"
@@ -415,61 +453,91 @@ export default function Home() {
             initial="initial"
             animate="animate"
             exit="exit"
-            // Attach Mouse Drag Handlers
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMoveDrag}
             onMouseUp={handleMouseUpDrag}
             onMouseLeave={handleMouseUpDrag}
             className="absolute inset-0 w-full h-full flex flex-col justify-center z-20 cursor-grab active:cursor-grabbing"
           >
-            <div className="w-full px-10 mb-8 mt-5">
-              <motion.h2
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="text-3xl md:text-5xl font-bold uppercase tracking-tighter"
+            {/* LEFT TEXT CONTAINER - Animates with Scroll */}
+            <div className="absolute left-0 top-0 bottom-0 w-[30%] hidden md:flex flex-col justify-center px-12 z-30 pointer-events-none">
+              <motion.div
+                style={{
+                  x: textX,
+                  opacity: textOpacity,
+                  filter: textBlurFilter,
+                }}
+                className="border-l-4 border-white/20 pl-6"
               >
-                Trending Now
-              </motion.h2>
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.6 }}
-                transition={{ delay: 0.5 }}
-                className="text-xl font-mono mt-2"
-              >
-                &larr; Scroll Down (or Swipe) to Explore &rarr;
-              </motion.p>
+                <motion.h2
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3, duration: 0.8 }}
+                  className="text-6xl font-black uppercase tracking-tighter leading-none"
+                >
+                  Trending
+                  <br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-500">
+                    Now
+                  </span>
+                </motion.h2>
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.6 }}
+                  transition={{ delay: 0.5 }}
+                  className="text-lg font-mono mt-4 tracking-widest"
+                >
+                  WINTER COLLECTION
+                </motion.p>
+              </motion.div>
             </div>
 
-            {/* Horizontal Track */}
-            <div className="w-full h-[60vh] flex items-center overflow-visible">
+            {/* Mobile Header */}
+            <div className="md:hidden w-full px-10 mb-10 mt-5 text-center relative z-30 pointer-events-none">
+              <h2 className="text-3xl font-bold uppercase tracking-tighter">
+                Trending Now
+              </h2>
+            </div>
+
+            {/* Carousel Track */}
+            <div className="w-full h-[60vh] flex items-center overflow-visible mt-4 relative z-20">
               <motion.div
                 ref={productTrackRef}
                 style={{ x: springX }}
-                className="flex gap-8 pl-10 pr-20"
+                className="flex gap-8 items-center"
+                {...{
+                  style: {
+                    x: springX,
+                    display: "flex",
+                    gap: "2rem",
+                    paddingLeft: "calc(50vw - 150px)",
+                    paddingRight: "calc(50vw - 150px)",
+                    alignItems: "center",
+                  },
+                }}
               >
-                {PRODUCTS.map((product) => (
-                  <Link
-                    to={`/shop/${product.id}`}
+                {PRODUCTS.map((product, index) => (
+                  <CarouselItem
                     key={product.id}
-                    className="w-[300px] md:w-[300px] flex-shrink-0"
-                  >
-                    <ProductCard {...product} />
-                  </Link>
+                    product={product}
+                    index={index}
+                    x={springX}
+                    isClickBlockedRef={isClickBlocked}
+                  />
                 ))}
-                {/* Visual Cue at the end */}
+
                 <div
-                  className="flex-shrink-0 flex items-center justify-center opacity-50 font-mono text-xl"
-                  style={{ width: "300px", paddingLeft: "50px" }}
+                  className="flex-shrink-0 flex items-center justify-center opacity-30 font-mono text-xl"
+                  style={{ width: "200px" }}
                 >
-                  KEEP SCROLLING &rarr;
+                  view all &rarr;
                 </div>
               </motion.div>
             </div>
           </motion.section>
         )}
 
-        {/* --- SECTION 2: FEATURED COLLECTION --- */}
+        {/* --- FEATURED --- */}
         {currentSection === 2 && (
           <motion.section
             key="featured"
@@ -480,48 +548,79 @@ export default function Home() {
             exit="exit"
             className="absolute inset-0 w-full h-full flex flex-col items-center justify-center px-4 md:px-10 z-10"
           >
-            <div className="w-full mt-[90px] max-w-6xl h-[70vh] rounded-3xl border-2 border-dashed border-gray-700/50 flex items-center justify-center bg-white/5 backdrop-blur-sm relative overflow-hidden group">
+            {/* ZOOM TRANSITION CONTAINER */}
+            <motion.div
+              layout
+              initial={{
+                width: "100%",
+                maxWidth: "72rem",
+                height: "70vh",
+                borderRadius: "1.5rem",
+                marginTop: "90px",
+                borderWidth: "2px",
+              }}
+              animate={
+                isZooming
+                  ? {
+                      // ZOOM TO FULL SCREEN
+                      width: "100vw",
+                      maxWidth: "100vw",
+                      height: "100vh",
+                      borderRadius: 0,
+                      marginTop: 0,
+                      borderWidth: 0,
+                      transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
+                    }
+                  : {
+                      // NORMAL STATE
+                      width: "100%",
+                      maxWidth: "72rem",
+                      height: "70vh",
+                      borderRadius: "1.5rem",
+                      marginTop: "90px",
+                      borderWidth: "2px",
+                    }
+              }
+              className={`relative flex items-center justify-center bg-white/5 backdrop-blur-sm overflow-hidden group border-dashed border-gray-700/50 ${
+                isZooming ? "z-50" : ""
+              }`}
+            >
               <div className="absolute inset-0">
                 <img
-                  src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1920&auto=format&fit=crop"
-                  className="w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-1000"
+                  // Matches Shop.jsx first slide
+                  src="https://images.unsplash.com/photo-1552346154-21d32810aba3?q=80&w=1600&auto=format&fit=crop"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
+                  style={{ opacity: isZooming ? 1 : 0.4 }}
                   alt="Collection"
                 />
-                <div className="absolute inset-0 bg-black/50" />
+                <div
+                  className="absolute inset-0 bg-black/50"
+                  style={{
+                    opacity: isZooming ? 0 : 1,
+                    transition: "opacity 0.5s",
+                  }}
+                />
               </div>
 
-              <div className="text-center relative z-10">
+              {/* Text fades out when zooming starts */}
+              <motion.div
+                animate={{ opacity: isZooming ? 0 : 1 }}
+                transition={{ duration: 0.3 }}
+                className="text-center relative z-10"
+              >
                 <h2 className="text-5xl md:text-8xl font-black uppercase mb-4 drop-shadow-2xl">
                   Featured
                   <br />
                   Collection
                 </h2>
-                <p className="text-2xl text-white/80 font-mono mb-8">
-                  [ The Urban Explorer Series ]
-                </p>
                 <button
                   onClick={() => navigate("/shop")}
                   className="px-10 py-4 bg-white text-black font-bold text-lg rounded-full hover:scale-105 transition-transform"
                 >
                   Discover Now
                 </button>
-              </div>
-            </div>
-
-            {/* 👇 scroll hint */}
-            <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: 0.3,
-                duration: 1,
-                repeat: Infinity,
-                repeatType: "mirror",
-              }}
-              className="mt-6 text-sm text-white/60 tracking-widest font-light uppercase"
-            >
-              ↓ Scroll down to shop more ↓
-            </motion.p>
+              </motion.div>
+            </motion.div>
           </motion.section>
         )}
       </AnimatePresence>
