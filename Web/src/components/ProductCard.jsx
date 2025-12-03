@@ -17,7 +17,7 @@ const ProductCard = ({ title, price, category, image1, image2, badge }) => {
   const badgeStyle = getBadgeStyle(badge);
 
   return (
-    <div className="group relative w-full max-w-sm mx-auto">
+    <div className="group relative w-full max-w-sm mx-auto select-none">
       {/* --- IMAGE CONTAINER --- */}
       <div
         className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl transition-colors duration-300"
@@ -59,19 +59,22 @@ const ProductCard = ({ title, price, category, image1, image2, badge }) => {
         </div>
 
         {/* Images (Swap Logic) */}
+        {/* Added draggable={false} to prevent ghost image dragging */}
         <div className="w-full h-full cursor-pointer">
           {/* Primary Image */}
           <img
             src={image1}
             alt={title}
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 mix-blend-overlay opacity-90"
-            // Note: mix-blend can be removed if you want pure images,
-            // but it helps blend into the theme background slightly
           />
           {/* Secondary Image */}
           <img
             src={image2}
             alt={title}
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
             className="absolute inset-0 w-full h-full object-cover transition-all duration-700 opacity-0 group-hover:opacity-100 group-hover:scale-110 mix-blend-overlay"
           />
         </div>
