@@ -4,6 +4,7 @@ export const lightTheme = {
   name: "light",
   bg: "#ffffff",
   text: "#000000",
+  arrowBg: "#ffffff",
   navbar: {
     bg: "rgba(255, 255, 255, 0.85)",
     border: "rgba(0, 0, 0, 0.1)",
@@ -46,6 +47,8 @@ export const darkTheme = {
   name: "dark",
   bg: "#050505",
   text: "#ffffff",
+  arrowBg: "#000000",
+
   navbar: {
     bg: "rgba(26, 26, 26, 0.85)",
     border: "rgba(255, 255, 255, 0.1)",

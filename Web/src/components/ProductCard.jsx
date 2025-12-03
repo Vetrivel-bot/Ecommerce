@@ -67,7 +67,7 @@ const ProductCard = ({ title, price, category, image1, image2, badge }) => {
             alt={title}
             draggable={false}
             onDragStart={(e) => e.preventDefault()}
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 mix-blend-overlay opacity-90"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 hover:opacity-0 group-hover:scale-110  opacity-90"
           />
           {/* Secondary Image */}
           <img
@@ -75,7 +75,7 @@ const ProductCard = ({ title, price, category, image1, image2, badge }) => {
             alt={title}
             draggable={false}
             onDragStart={(e) => e.preventDefault()}
-            className="absolute inset-0 w-full h-full object-cover transition-all duration-700 opacity-0 group-hover:opacity-100 group-hover:scale-110 mix-blend-overlay"
+            className="absolute inset-0 w-full h-full object-cover transition-all duration-700 opacity-0 group-hover:opacity-90 group-hover:scale-110 "
           />
         </div>
 
