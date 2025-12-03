@@ -185,7 +185,6 @@ const CarouselItem = ({ product, index, x, isClickBlockedRef }) => {
         whileTap={{ scale: 0.95 }}
         transition={{ type: "spring", stiffness: 400, damping: 17 }}
         // IMPORTANT: Prevent default drag behavior to avoid ghost image
-        // and allow custom mouse dragging logic to work properly.
         onDragStart={(e) => e.preventDefault()}
         className="w-full h-full block"
       >
@@ -194,7 +193,6 @@ const CarouselItem = ({ product, index, x, isClickBlockedRef }) => {
           className="block w-full h-full"
           draggable={false}
           onClick={(e) => {
-            // If the user was dragging, prevent the navigation click.
             if (isClickBlockedRef.current) {
               e.preventDefault();
             }
@@ -212,6 +210,9 @@ export default function Home() {
   const [currentSection, setCurrentSection] = useState(0);
   const [direction, setDirection] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+
+  // ZOOM STATE: 'idle' or 'full' (zooming in)
+  const [isZooming, setIsZooming] = useState(false);
   const navigate = useNavigate();
 
   // --- HORIZONTAL SCROLL LOGIC ---
@@ -233,12 +234,11 @@ export default function Home() {
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
   const isMouseDragging = useRef(false);
-  // NEW: Ref to track if a drag occurred to block clicks
   const isClickBlocked = useRef(false);
 
   const TOTAL_SECTIONS = 3;
   const HORIZONTAL_BUFFER = 200;
-  const EXIT_THRESHOLD = 150;
+  const EXIT_THRESHOLD = 350; // Require noticeable scroll to trigger zoom
 
   const updateHorizontal = (val) => {
     xRef.current = val;
@@ -272,10 +272,10 @@ export default function Home() {
           if (sectionRef.current < TOTAL_SECTIONS - 1) {
             triggerSectionChange(sectionRef.current + 1, 1);
           } else {
+            // --- SECTION 2 END LOGIC: TRIGGER ZOOM ---
             exitAccumulator.current += delta;
-            if (exitAccumulator.current > EXIT_THRESHOLD) {
-              animatingRef.current = true;
-              navigate("/shop");
+            if (exitAccumulator.current > EXIT_THRESHOLD && !isZooming) {
+              setIsZooming(true);
             }
           }
         } else if (delta < 0) {
@@ -310,15 +310,26 @@ export default function Home() {
         }
       }
     },
-    [triggerSectionChange, navigate]
+    [triggerSectionChange, isZooming]
   );
+
+  // --- NAVIGATE AFTER ZOOM COMPLETES ---
+  useEffect(() => {
+    if (isZooming) {
+      // Wait for the zoom animation (0.8s) then navigate
+      const timeout = setTimeout(() => {
+        // Navigate and pass state to indicate we are coming from a zoom
+        navigate("/shop", { state: { fromZoom: true } });
+      }, 800);
+      return () => clearTimeout(timeout);
+    }
+  }, [isZooming, navigate]);
 
   const handleMouseDown = useCallback((e) => {
     if (sectionRef.current === 1) {
       isMouseDragging.current = true;
       touchStartX.current = e.clientX;
       document.body.style.cursor = "grabbing";
-      // Reset blocking status
       isClickBlocked.current = false;
     }
   }, []);
@@ -333,7 +344,6 @@ export default function Home() {
         processScroll(deltaX, 1.5);
         touchStartX.current = e.clientX;
 
-        // If moved more than 5 pixels, treat as a drag and block clicks
         if (Math.abs(deltaX) > 5 || Math.abs(xRef.current) > 5) {
           isClickBlocked.current = true;
         }
@@ -345,9 +355,6 @@ export default function Home() {
   const handleMouseUpDrag = useCallback(() => {
     isMouseDragging.current = false;
     document.body.style.cursor = "";
-
-    // Allow a small window for the click event to fire and check the flag,
-    // then reset it.
     setTimeout(() => {
       isClickBlocked.current = false;
     }, 100);
@@ -370,16 +377,14 @@ export default function Home() {
 
   const handleTouchMove = useCallback(
     (event) => {
-      event.preventDefault(); // This is crucial for custom touch handling
+      event.preventDefault();
       const deltaY = touchStartY.current - event.touches[0].clientY;
       const deltaX = touchStartX.current - event.touches[0].clientX;
 
       if (sectionRef.current === 1) {
-        // If moving significantly, block clicks on items
         if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
           isClickBlocked.current = true;
         }
-
         const dominantDelta =
           Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
         processScroll(dominantDelta, 2.0);
@@ -543,17 +548,66 @@ export default function Home() {
             exit="exit"
             className="absolute inset-0 w-full h-full flex flex-col items-center justify-center px-4 md:px-10 z-10"
           >
-            <div className="w-full mt-[90px] max-w-6xl h-[70vh] rounded-3xl border-2 border-dashed border-gray-700/50 flex items-center justify-center bg-white/5 backdrop-blur-sm relative overflow-hidden group">
+            {/* ZOOM TRANSITION CONTAINER */}
+            <motion.div
+              layout
+              initial={{
+                width: "100%",
+                maxWidth: "72rem",
+                height: "70vh",
+                borderRadius: "1.5rem",
+                marginTop: "90px",
+                borderWidth: "2px",
+              }}
+              animate={
+                isZooming
+                  ? {
+                      // ZOOM TO FULL SCREEN
+                      width: "100vw",
+                      maxWidth: "100vw",
+                      height: "100vh",
+                      borderRadius: 0,
+                      marginTop: 0,
+                      borderWidth: 0,
+                      transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
+                    }
+                  : {
+                      // NORMAL STATE
+                      width: "100%",
+                      maxWidth: "72rem",
+                      height: "70vh",
+                      borderRadius: "1.5rem",
+                      marginTop: "90px",
+                      borderWidth: "2px",
+                    }
+              }
+              className={`relative flex items-center justify-center bg-white/5 backdrop-blur-sm overflow-hidden group border-dashed border-gray-700/50 ${
+                isZooming ? "z-50" : ""
+              }`}
+            >
               <div className="absolute inset-0">
                 <img
-                  src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1920&auto=format&fit=crop"
-                  className="w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-1000"
+                  // Matches Shop.jsx first slide
+                  src="https://images.unsplash.com/photo-1552346154-21d32810aba3?q=80&w=1600&auto=format&fit=crop"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
+                  style={{ opacity: isZooming ? 1 : 0.4 }}
                   alt="Collection"
                 />
-                <div className="absolute inset-0 bg-black/50" />
+                <div
+                  className="absolute inset-0 bg-black/50"
+                  style={{
+                    opacity: isZooming ? 0 : 1,
+                    transition: "opacity 0.5s",
+                  }}
+                />
               </div>
 
-              <div className="text-center relative z-10">
+              {/* Text fades out when zooming starts */}
+              <motion.div
+                animate={{ opacity: isZooming ? 0 : 1 }}
+                transition={{ duration: 0.3 }}
+                className="text-center relative z-10"
+              >
                 <h2 className="text-5xl md:text-8xl font-black uppercase mb-4 drop-shadow-2xl">
                   Featured
                   <br />
@@ -565,8 +619,8 @@ export default function Home() {
                 >
                   Discover Now
                 </button>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           </motion.section>
         )}
       </AnimatePresence>

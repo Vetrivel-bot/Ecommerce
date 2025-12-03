@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { ThemeContext } from "../context/ThemeContext";
 import ProductCard from "../components/ProductCard";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 // --- 1. CONFIGURATION & MOCK DATA ---
 
@@ -191,33 +191,47 @@ const swipePower = (offset, velocity) => {
   return Math.abs(offset) * velocity;
 };
 
-const HeroCarousel = ({ slides, autoPlayInterval = 5000 }) => {
+// Updated to accept delay props for staggered reveal
+const HeroCarousel = ({
+  slides,
+  autoPlayInterval = 5000,
+  textDelay = 0,
+  controlsDelay = 0,
+  isIntro = false,
+}) => {
   const [[page, direction], setPage] = useState([0, 0]);
-  const [isPaused, setIsPaused] = useState(false);
+  const [isPaused, setIsPaused] = useState(isIntro);
+  const [isHovered, setIsHovered] = useState(false);
 
   // Wrap around logic using modulus
   const imageIndex = Math.abs(page % slides.length);
 
-  const paginate = useCallback(
-    (newDirection) => {
-      setPage([page + newDirection, newDirection]);
-    },
-    [page]
-  );
+  const paginate = useCallback((newDirection) => {
+    setPage(([p]) => [p + newDirection, newDirection]);
+  }, []);
 
   useEffect(() => {
-    if (isPaused) return;
+    setIsPaused(isIntro);
+  }, [isIntro]);
+
+  useEffect(() => {
+    if (isPaused || isHovered) return;
     const timer = setInterval(() => {
       paginate(1);
     }, autoPlayInterval);
     return () => clearInterval(timer);
-  }, [page, isPaused, autoPlayInterval, paginate]);
+  }, [page, isPaused, isHovered, autoPlayInterval, paginate]);
+
+  // Sync Text Logic EXACTLY with Arrows
+  // If we are in Intro, wait for controlsDelay. If normal, wait 0.2s.
+  const currentTextDelay = isIntro ? controlsDelay : 0.2;
+  const currentDuration = isIntro ? 0.8 : 0.5;
 
   return (
     <div
-      className="relative -mt-23 w-full h-full overflow-hidden bg-black"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
+      className="relative w-full h-full overflow-hidden bg-black"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       <AnimatePresence initial={false} custom={direction}>
         <motion.div
@@ -232,10 +246,11 @@ const HeroCarousel = ({ slides, autoPlayInterval = 5000 }) => {
             opacity: { duration: 0.2 },
             scale: { duration: 0.5 },
           }}
-          drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
+          drag={isIntro ? false : "x"}
+          dragConstraints={isIntro ? undefined : { left: 0, right: 0 }}
           dragElastic={1}
           onDragEnd={(e, { offset, velocity }) => {
+            if (isIntro) return;
             const swipe = swipePower(offset.x, velocity.x);
             if (swipe < -swipeConfidenceThreshold) {
               paginate(1);
@@ -243,7 +258,9 @@ const HeroCarousel = ({ slides, autoPlayInterval = 5000 }) => {
               paginate(-1);
             }
           }}
-          className="absolute inset-0 cursor-grab active:cursor-grabbing"
+          className={`absolute inset-0 ${
+            isIntro ? "cursor-auto" : "cursor-grab active:cursor-grabbing"
+          }`}
         >
           {/* Responsive Picture */}
           <picture>
@@ -262,12 +279,25 @@ const HeroCarousel = ({ slides, autoPlayInterval = 5000 }) => {
             />
           </picture>
 
-          {/* Dynamic Slide Text */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10 pointer-events-none p-4">
+          {/* Dynamic Slide Text - Hidden initially in Intro, revealed WITH arrows */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{
+              delay: currentTextDelay, // SYNCED with arrows
+              duration: currentDuration,
+              ease: "easeOut",
+            }}
+            className="absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10 pointer-events-none p-4"
+          >
             {slides[imageIndex].title && (
               <motion.h2
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
+                transition={{
+                  delay: currentTextDelay + 0.1,
+                  duration: currentDuration,
+                }}
                 className="text-5xl md:text-7xl font-black uppercase tracking-tighter drop-shadow-2xl"
               >
                 {slides[imageIndex].title}
@@ -277,47 +307,71 @@ const HeroCarousel = ({ slides, autoPlayInterval = 5000 }) => {
               <motion.p
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 0.9 }}
-                transition={{ delay: 0.1 }}
+                transition={{
+                  delay: currentTextDelay + 0.2,
+                  duration: currentDuration,
+                }}
                 className="text-lg md:text-2xl font-light mt-2 drop-shadow-md"
               >
                 {slides[imageIndex].subtitle}
               </motion.p>
             )}
-          </div>
+          </motion.div>
         </motion.div>
       </AnimatePresence>
 
-      {/* Controls */}
-      <div className="absolute inset-0 flex items-center justify-between p-4 z-20 pointer-events-none">
-        <button
-          className="pointer-events-auto p-3 rounded-full bg-black/20 hover:bg-white/20 backdrop-blur-md text-white transition-all"
-          onClick={() => paginate(-1)}
-        >
-          <ChevronLeft size={32} />
-        </button>
-        <button
-          className="pointer-events-auto p-3 rounded-full bg-black/20 hover:bg-white/20 backdrop-blur-md text-white transition-all"
-          onClick={() => paginate(1)}
-        >
-          <ChevronRight size={32} />
-        </button>
-      </div>
-
-      {/* Indicators */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-3 z-20">
-        {slides.map((_, index) => (
+      {/* Controls & Indicators - Revealed with delay in Intro */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: controlsDelay, duration: 0.8 }}
+        className="absolute inset-0 pointer-events-none"
+      >
+        {/* Arrows */}
+        <div className="absolute inset-0 flex items-center justify-between p-4 z-20">
           <button
-            key={index}
-            onClick={() => {
-              const direction = index > imageIndex ? 1 : -1;
-              setPage([page + (index - imageIndex), direction]);
-            }}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              index === imageIndex ? "w-8 bg-white" : "w-2 bg-white/40"
+            className={`pointer-events-auto p-3 rounded-full bg-black/20 hover:bg-white/20 backdrop-blur-md text-white transition-all ${
+              isIntro ? "opacity-50 pointer-events-none" : ""
             }`}
-          />
-        ))}
-      </div>
+            onClick={() => {
+              if (isIntro) return;
+              paginate(-1);
+            }}
+            aria-disabled={isIntro}
+          >
+            <ChevronLeft size={32} />
+          </button>
+          <button
+            className={`pointer-events-auto p-3 rounded-full bg-black/20 hover:bg-white/20 backdrop-blur-md text-white transition-all ${
+              isIntro ? "opacity-50 pointer-events-none" : ""
+            }`}
+            onClick={() => {
+              if (isIntro) return;
+              paginate(1);
+            }}
+            aria-disabled={isIntro}
+          >
+            <ChevronRight size={32} />
+          </button>
+        </div>
+
+        {/* Dots */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-3 z-20 pointer-events-none">
+          {slides.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => {
+                if (isIntro) return;
+                const direction = index > imageIndex ? 1 : -1;
+                setPage(([p]) => [p + (index - imageIndex), direction]);
+              }}
+              className={`h-2 rounded-full transition-all duration-300 pointer-events-auto ${
+                index === imageIndex ? "w-8 bg-white" : "w-2 bg-white/40"
+              }`}
+            />
+          ))}
+        </div>
+      </motion.div>
     </div>
   );
 };
@@ -344,8 +398,12 @@ const itemVariants = {
 
 const Shop = () => {
   const { theme } = useContext(ThemeContext);
+  const location = useLocation();
+  const fromZoom = location.state?.fromZoom ?? true;
 
-  // Filter & Sort State
+  const [isIntroSequence, setIsIntroSequence] = useState(fromZoom);
+
+  const [isMobile, setIsMobile] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSortOpen, setIsSortOpen] = useState(false);
@@ -353,14 +411,28 @@ const Shop = () => {
   const [sortOption, setSortOption] = useState("Newest");
   const [priceRange, setPriceRange] = useState({ min: 0, max: 1000 });
 
-  // Refs for Product Section and Horizontal Scroll Container
   const productSectionRef = useRef(null);
   const scrollContainerRef = useRef(null);
-
-  // --- DRAG TO SCROLL LOGIC ---
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (isIntroSequence) {
+      // Sequence: 0.5s hold + 1.2s shrink + buffer
+      const timer = setTimeout(() => {
+        setIsIntroSequence(false);
+      }, 1800);
+      return () => clearTimeout(timer);
+    }
+  }, [isIntroSequence]);
 
   const handleMouseDown = (e) => {
     setIsDragging(true);
@@ -380,39 +452,32 @@ const Shop = () => {
     if (!isDragging) return;
     e.preventDefault();
     const x = e.pageX - scrollContainerRef.current.offsetLeft;
-    const walk = (x - startX) * 2; // scroll-fast speed multiplier
+    const walk = (x - startX) * 2;
     scrollContainerRef.current.scrollLeft = scrollLeft - walk;
   };
 
-  // Helper to scroll smoothly to the products
   const scrollToProducts = useCallback(() => {
     if (productSectionRef.current) {
       const yOffset = -100;
       const element = productSectionRef.current;
       const y =
         element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-
       window.scrollTo({ top: y, behavior: "smooth" });
     }
   }, []);
 
-  // First Scroll Hijack Logic
   useEffect(() => {
     const handleWheel = (e) => {
       if (window.scrollY < 10 && e.deltaY > 0) {
-        e.preventDefault();
-        scrollToProducts();
+        // scrollToProducts();
       }
     };
-
     window.addEventListener("wheel", handleWheel, { passive: false });
     return () => window.removeEventListener("wheel", handleWheel);
   }, [scrollToProducts]);
 
-  // Handle Dual Range Slider
   const handlePriceChange = (e, type) => {
     const value = Math.min(Math.max(Number(e.target.value), 0), 1000);
-
     if (type === "min") {
       if (value <= priceRange.max) {
         setPriceRange((prev) => ({ ...prev, min: value }));
@@ -424,16 +489,11 @@ const Shop = () => {
     }
   };
 
-  // Filtering Logic
   const filteredProducts = useMemo(() => {
     let result = [...PRODUCTS_DATA];
-
-    // 1. Category
     if (activeCategory !== "All") {
       result = result.filter((p) => p.category === activeCategory);
     }
-
-    // 2. Search
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -442,13 +502,9 @@ const Shop = () => {
           p.category.toLowerCase().includes(q)
       );
     }
-
-    // 3. Price
     result = result.filter(
       (p) => p.price >= priceRange.min && p.price <= priceRange.max
     );
-
-    // 4. Sort
     if (sortOption === "Price: Low to High") {
       result.sort((a, b) => a.price - b.price);
     } else if (sortOption === "Price: High to Low") {
@@ -459,397 +515,393 @@ const Shop = () => {
     return result;
   }, [activeCategory, searchQuery, sortOption, priceRange]);
 
+  // --- OPTIMIZED TIMING FOR ILLUSION ---
+  // 1. Hold Fullscreen for 0.5s
+  const SHRINK_DELAY = fromZoom ? 0.5 : 0;
+  // 2. Reveal Text & Arrows at 1.2s (synchronized)
+  const TEXT_DELAY = fromZoom ? 1.2 : 0;
+  const CONTROLS_DELAY = fromZoom ? 1.2 : 0;
+  // 3. Reveal Content after shrink
+  const CONTENT_DELAY = fromZoom ? 1.5 : 0.2;
+
   return (
     <div
       className="min-h-screen w-full transition-colors duration-500"
       style={{ backgroundColor: theme.bg, color: theme.text }}
     >
       <style>{`
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        
-        /* Dual Range Slider Styles */
-        .range-slider {
-          position: relative;
-          height: 6px;
-          border-radius: 10px;
-          background: ${theme.navbar.border};
-        }
-        
-        .range-progress {
-          position: absolute;
-          height: 100%;
-          border-radius: 10px;
-          background: ${theme.text};
-        }
-        
-        .range-input {
-          position: absolute;
-          top: -7px;
-          height: 20px;
-          width: 100%;
-          background: none;
-          pointer-events: none;
-          -webkit-appearance: none;
-          appearance: none;
-        }
-        
-        .range-input::-webkit-slider-thumb {
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: ${theme.text};
-          border: 2px solid ${theme.bg};
-          pointer-events: auto;
-          -webkit-appearance: none;
-          box-shadow: 0 0 6px rgba(0,0,0,0.2);
-          cursor: pointer;
-        }
-        
-        .range-input::-moz-range-thumb {
-          height: 20px;
-          width: 20px;
-          border: none;
-          border-radius: 50%;
-          background: ${theme.text};
-          pointer-events: auto;
-          -moz-appearance: none;
-          box-shadow: 0 0 6px rgba(0,0,0,0.2);
-          cursor: pointer;
-        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .range-slider { position: relative; height: 6px; border-radius: 10px; background: ${theme.navbar.border}; }
+        .range-progress { position: absolute; height: 100%; border-radius: 10px; background: ${theme.text}; }
+        .range-input { position: absolute; top: -7px; height: 20px; width: 100%; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+        .range-input::-webkit-slider-thumb { height: 20px; width: 20px; border-radius: 50%; background: ${theme.text}; border: 2px solid ${theme.bg}; pointer-events: auto; -webkit-appearance: none; box-shadow: 0 0 6px rgba(0,0,0,0.2); cursor: pointer; }
+        .range-input::-moz-range-thumb { height: 20px; width: 20px; border: none; border-radius: 50%; background: ${theme.text}; pointer-events: auto; -moz-appearance: none; box-shadow: 0 0 6px rgba(0,0,0,0.2); cursor: pointer; }
       `}</style>
 
-      {/* 1. CAROUSEL SECTION */}
-      <div className="w-full h-[60vh] md:h-[70vh]">
-        <HeroCarousel slides={HERO_SLIDES} />
-      </div>
+      {/* --- CAROUSEL WITH SHRINK ANIMATION --- */}
+      <motion.div
+        // REMOVED opacity transition so image shows immediately
+        initial={fromZoom ? { height: "100vh" } : false}
+        animate={{ height: isMobile ? "60vh" : "70vh" }}
+        transition={{
+          delay: SHRINK_DELAY, // Holds at 100vh for 0.5s
+          duration: 1.2, // Then smooth quick shrink
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className="w-full overflow-hidden -mt-[90px]"
+        style={!fromZoom ? { height: isMobile ? "60vh" : "70vh" } : {}}
+      >
+        <div className="w-full h-full">
+          <HeroCarousel
+            slides={HERO_SLIDES}
+            textDelay={TEXT_DELAY} // Pass 1.2s delay for text
+            controlsDelay={CONTROLS_DELAY} // Pass 1.2s delay for arrows
+            isIntro={isIntroSequence}
+          />
+        </div>
+      </motion.div>
 
-      {/* 2. FILTER BAR */}
-      <div
-        ref={productSectionRef}
-        // Removed 'sticky' class as requested
-        className="w-full px-6 md:px-12 py-6 border-y transition-colors duration-300"
-        style={{
-          backgroundColor: theme.navbar.bg.replace("0.85", "0.7"),
-          borderColor: theme.navbar.border,
+      {/* --- REST OF PAGE FADE IN --- */}
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          delay: CONTENT_DELAY,
+          duration: 0.8,
+          ease: "easeOut",
         }}
       >
-        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-6 items-center justify-between">
-          {/* LEFT: Categories (Flexible Width to avoid overlap) */}
-          <div className="flex-1 min-w-0 w-full xl:w-auto relative">
-            <div
-              ref={scrollContainerRef}
-              onMouseDown={handleMouseDown}
-              onMouseLeave={handleMouseLeave}
-              onMouseUp={handleMouseUp}
-              onMouseMove={handleMouseMove}
-              className="no-scrollbar flex items-center gap-3 overflow-x-auto w-full pb-2 md:pb-0 cursor-grab active:cursor-grabbing select-none px-6"
-              style={{
-                maskImage:
-                  "linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent)",
-                WebkitMaskImage:
-                  "linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent)",
-              }}
-            >
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => {
-                    if (!isDragging) setActiveCategory(cat);
-                  }}
-                  className={`px-6 py-2.5 rounded-full text-sm font-bold uppercase tracking-wide transition-all duration-300 whitespace-nowrap ${
-                    activeCategory === cat
-                      ? "scale-105 shadow-lg"
-                      : "hover:opacity-60"
-                  }`}
-                  style={{
-                    backgroundColor:
-                      activeCategory === cat
-                        ? theme.text
-                        : theme.navbar.activePill,
-                    color: activeCategory === cat ? theme.bg : theme.text,
-                  }}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* RIGHT: Search, Price, Sort (Fixed group) */}
-          <div className="flex-none w-full xl:w-auto flex flex-wrap lg:flex-nowrap items-center gap-4 justify-between xl:justify-end">
-            {/* Search */}
-            <div className="relative group w-full sm:w-auto flex-1 md:w-72">
-              <Search
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50"
-              />
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl outline-none border transition-all duration-300"
+        {/* 2. FILTER BAR */}
+        <div
+          ref={productSectionRef}
+          className="w-full px-6 md:px-12 py-6 border-y transition-colors duration-300"
+          style={{
+            backgroundColor: theme.navbar.bg.replace("0.85", "0.7"),
+            borderColor: theme.navbar.border,
+          }}
+        >
+          {/* ... (Filter Bar Content - same as before) ... */}
+          <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-6 items-center justify-between">
+            {/* LEFT: Categories */}
+            <div className="flex-1 min-w-0 w-full xl:w-auto relative">
+              <div
+                ref={scrollContainerRef}
+                onMouseDown={handleMouseDown}
+                onMouseLeave={handleMouseLeave}
+                onMouseUp={handleMouseUp}
+                onMouseMove={handleMouseMove}
+                className="no-scrollbar flex items-center gap-3 overflow-x-auto w-full pb-2 md:pb-0 cursor-grab active:cursor-grabbing select-none px-6"
                 style={{
-                  backgroundColor: theme.navbar.searchBg,
-                  color: theme.text,
-                  borderColor: "transparent",
+                  maskImage:
+                    "linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent)",
+                  WebkitMaskImage:
+                    "linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent)",
                 }}
-              />
+              >
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      if (!isDragging) setActiveCategory(cat);
+                    }}
+                    className={`px-6 py-2.5 rounded-full text-sm font-bold uppercase tracking-wide transition-all duration-300 whitespace-nowrap ${
+                      activeCategory === cat
+                        ? "scale-105 shadow-lg"
+                        : "hover:opacity-60"
+                    }`}
+                    style={{
+                      backgroundColor:
+                        activeCategory === cat
+                          ? theme.text
+                          : theme.navbar.activePill,
+                      color: activeCategory === cat ? theme.bg : theme.text,
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="flex gap-3 w-full sm:w-auto">
-              {/* Price Filter */}
-              <div className="relative w-1/2 sm:w-auto">
-                <button
-                  onClick={() => {
-                    setIsPriceOpen(!isPriceOpen);
-                    setIsSortOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between gap-2 px-5 py-2.5 rounded-xl font-medium text-sm border transition-all hover:opacity-80 whitespace-nowrap"
+            {/* RIGHT: Search, Price, Sort */}
+            <div className="flex-none w-full xl:w-auto flex flex-wrap lg:flex-nowrap items-center gap-4 justify-between xl:justify-end">
+              {/* Search */}
+              <div className="relative group w-full sm:w-auto flex-1 md:w-72">
+                <Search
+                  size={18}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50"
+                />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl outline-none border transition-all duration-300"
                   style={{
                     backgroundColor: theme.navbar.searchBg,
-                    borderColor: theme.navbar.border,
+                    color: theme.text,
+                    borderColor: "transparent",
                   }}
-                >
-                  <div className="flex items-center gap-2">
-                    <DollarSign size={16} />
-                    <span>Price</span>
-                  </div>
-                  <ChevronDown
-                    size={14}
-                    className={`transition-transform duration-300 ${
-                      isPriceOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                <AnimatePresence>
-                  {isPriceOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 top-full mt-2 w-72 rounded-2xl shadow-2xl overflow-hidden border p-5 z-50"
-                      style={{
-                        backgroundColor: theme.navbar.modalBg,
-                        borderColor: theme.navbar.border,
-                      }}
-                    >
-                      <div className="flex flex-col gap-6">
-                        <div
-                          className="flex justify-between items-center border-b pb-3"
-                          style={{ borderColor: theme.navbar.border }}
-                        >
-                          <span className="font-bold text-sm">Price Range</span>
-                          <button
-                            onClick={() => setPriceRange({ min: 0, max: 1000 })}
-                            className="text-xs font-semibold opacity-50 hover:opacity-100 transition-opacity"
-                          >
-                            Reset
-                          </button>
-                        </div>
-
-                        <div className="py-2 px-1">
-                          <div className="range-slider">
-                            <div
-                              className="range-progress"
-                              style={{
-                                left: `${(priceRange.min / 1000) * 100}%`,
-                                right: `${
-                                  100 - (priceRange.max / 1000) * 100
-                                }%`,
-                              }}
-                            ></div>
-                            <input
-                              type="range"
-                              className="range-input"
-                              min="0"
-                              max="1000"
-                              value={priceRange.min}
-                              onChange={(e) => handlePriceChange(e, "min")}
-                            />
-                            <input
-                              type="range"
-                              className="range-input"
-                              min="0"
-                              max="1000"
-                              value={priceRange.max}
-                              onChange={(e) => handlePriceChange(e, "max")}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="flex-1 p-2 rounded-lg border text-center"
-                            style={{ borderColor: theme.navbar.border }}
-                          >
-                            <span className="text-[10px] uppercase opacity-50 block mb-1">
-                              Min Price
-                            </span>
-                            <span className="font-mono text-sm">
-                              ${priceRange.min}
-                            </span>
-                          </div>
-                          <span className="opacity-30">-</span>
-                          <div
-                            className="flex-1 p-2 rounded-lg border text-center"
-                            style={{ borderColor: theme.navbar.border }}
-                          >
-                            <span className="text-[10px] uppercase opacity-50 block mb-1">
-                              Max Price
-                            </span>
-                            <span className="font-mono text-sm">
-                              ${priceRange.max}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                />
               </div>
 
-              {/* Sort */}
-              <div className="relative w-1/2 sm:w-auto">
-                <button
-                  onClick={() => {
-                    setIsSortOpen(!isSortOpen);
-                    setIsPriceOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between gap-2 px-5 py-2.5 rounded-xl font-medium text-sm border transition-all hover:opacity-80 whitespace-nowrap"
-                  style={{
-                    backgroundColor: theme.navbar.searchBg,
-                    borderColor: theme.navbar.border,
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <SlidersHorizontal size={16} />
-                    <span className="hidden sm:inline">Sort</span>
-                    <span className="sm:hidden">Sort</span>
-                  </div>
-                  <ChevronDown
-                    size={14}
-                    className={`transition-transform duration-300 ${
-                      isSortOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
+              <div className="flex gap-3 w-full sm:w-auto">
+                {/* Price Filter */}
+                <div className="relative w-1/2 sm:w-auto">
+                  <button
+                    onClick={() => {
+                      setIsPriceOpen(!isPriceOpen);
+                      setIsSortOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between gap-2 px-5 py-2.5 rounded-xl font-medium text-sm border transition-all hover:opacity-80 whitespace-nowrap"
+                    style={{
+                      backgroundColor: theme.navbar.searchBg,
+                      borderColor: theme.navbar.border,
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <DollarSign size={16} />
+                      <span>Price</span>
+                    </div>
+                    <ChevronDown
+                      size={14}
+                      className={`transition-transform duration-300 ${
+                        isPriceOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
 
-                <AnimatePresence>
-                  {isSortOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 top-full mt-2 w-56 rounded-2xl shadow-2xl overflow-hidden border p-2 z-50"
-                      style={{
-                        backgroundColor: theme.navbar.modalBg,
-                        borderColor: theme.navbar.border,
-                      }}
-                    >
-                      {[
-                        "Newest",
-                        "Price: Low to High",
-                        "Price: High to Low",
-                      ].map((opt) => (
-                        <button
-                          key={opt}
-                          onClick={() => {
-                            setSortOption(opt);
-                            setIsSortOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-3 text-sm font-medium rounded-xl transition-colors"
-                          style={{
-                            backgroundColor:
-                              sortOption === opt
-                                ? theme.navbar.activePill
-                                : "transparent",
-                            color: theme.text,
-                          }}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                  <AnimatePresence>
+                    {isPriceOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 top-full mt-2 w-72 rounded-2xl shadow-2xl overflow-hidden border p-5 z-50"
+                        style={{
+                          backgroundColor: theme.navbar.modalBg,
+                          borderColor: theme.navbar.border,
+                        }}
+                      >
+                        <div className="flex flex-col gap-6">
+                          <div
+                            className="flex justify-between items-center border-b pb-3"
+                            style={{ borderColor: theme.navbar.border }}
+                          >
+                            <span className="font-bold text-sm">
+                              Price Range
+                            </span>
+                            <button
+                              onClick={() =>
+                                setPriceRange({ min: 0, max: 1000 })
+                              }
+                              className="text-xs font-semibold opacity-50 hover:opacity-100 transition-opacity"
+                            >
+                              Reset
+                            </button>
+                          </div>
+
+                          <div className="py-2 px-1">
+                            <div className="range-slider">
+                              <div
+                                className="range-progress"
+                                style={{
+                                  left: `${(priceRange.min / 1000) * 100}%`,
+                                  right: `${
+                                    100 - (priceRange.max / 1000) * 100
+                                  }%`,
+                                }}
+                              ></div>
+                              <input
+                                type="range"
+                                className="range-input"
+                                min="0"
+                                max="1000"
+                                value={priceRange.min}
+                                onChange={(e) => handlePriceChange(e, "min")}
+                              />
+                              <input
+                                type="range"
+                                className="range-input"
+                                min="0"
+                                max="1000"
+                                value={priceRange.max}
+                                onChange={(e) => handlePriceChange(e, "max")}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="flex-1 p-2 rounded-lg border text-center"
+                              style={{ borderColor: theme.navbar.border }}
+                            >
+                              <span className="text-[10px] uppercase opacity-50 block mb-1">
+                                Min Price
+                              </span>
+                              <span className="font-mono text-sm">
+                                ${priceRange.min}
+                              </span>
+                            </div>
+                            <span className="opacity-30">-</span>
+                            <div
+                              className="flex-1 p-2 rounded-lg border text-center"
+                              style={{ borderColor: theme.navbar.border }}
+                            >
+                              <span className="text-[10px] uppercase opacity-50 block mb-1">
+                                Max Price
+                              </span>
+                              <span className="font-mono text-sm">
+                                ${priceRange.max}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* Sort */}
+                <div className="relative w-1/2 sm:w-auto">
+                  <button
+                    onClick={() => {
+                      setIsSortOpen(!isSortOpen);
+                      setIsPriceOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between gap-2 px-5 py-2.5 rounded-xl font-medium text-sm border transition-all hover:opacity-80 whitespace-nowrap"
+                    style={{
+                      backgroundColor: theme.navbar.searchBg,
+                      borderColor: theme.navbar.border,
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <SlidersHorizontal size={16} />
+                      <span className="hidden sm:inline">Sort</span>
+                      <span className="sm:hidden">Sort</span>
+                    </div>
+                    <ChevronDown
+                      size={14}
+                      className={`transition-transform duration-300 ${
+                        isSortOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  <AnimatePresence>
+                    {isSortOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 top-full mt-2 w-56 rounded-2xl shadow-2xl overflow-hidden border p-2 z-50"
+                        style={{
+                          backgroundColor: theme.navbar.modalBg,
+                          borderColor: theme.navbar.border,
+                        }}
+                      >
+                        {[
+                          "Newest",
+                          "Price: Low to High",
+                          "Price: High to Low",
+                        ].map((opt) => (
+                          <button
+                            key={opt}
+                            onClick={() => {
+                              setSortOption(opt);
+                              setIsSortOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-3 text-sm font-medium rounded-xl transition-colors"
+                            style={{
+                              backgroundColor:
+                                sortOption === opt
+                                  ? theme.navbar.activePill
+                                  : "transparent",
+                              color: theme.text,
+                            }}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* 3. PRODUCT GRID */}
-      <div className="max-w-[1600px] mx-auto px-6 md:px-12 py-12">
-        <AnimatePresence mode="popLayout">
-          {filteredProducts.length > 0 ? (
-            <motion.div
-              layout
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-12"
-            >
-              {filteredProducts.map((product) => (
-                <motion.div
-                  layout
-                  key={product.id}
-                  variants={itemVariants}
-                  exit="exit"
-                  className="w-full"
+        {/* 3. PRODUCT GRID */}
+        <div className="max-w-[1600px] mx-auto px-6 md:px-12 py-12">
+          <AnimatePresence mode="popLayout">
+            {filteredProducts.length > 0 ? (
+              <motion.div
+                layout
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-12"
+              >
+                {filteredProducts.map((product) => (
+                  <motion.div
+                    layout
+                    key={product.id}
+                    variants={itemVariants}
+                    exit="exit"
+                    className="w-full"
+                  >
+                    {/* PREVENT GHOST DRAG ON LINKS */}
+                    <Link
+                      to={`/shop/${product.id}`}
+                      onDragStart={(e) => e.preventDefault()}
+                    >
+                      <ProductCard
+                        title={product.title}
+                        price={product.price}
+                        category={product.category}
+                        image1={product.image1}
+                        image2={product.image2}
+                        badge={product.badge}
+                      />{" "}
+                    </Link>
+                  </motion.div>
+                ))}
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center py-24 text-center"
+              >
+                <div
+                  className="p-6 rounded-full mb-4 opacity-50"
+                  style={{ backgroundColor: theme.navbar.activePill }}
                 >
-                  <Link to={`/shop/${product.id}`}>
-                    <ProductCard
-                      title={product.title}
-                      price={product.price}
-                      category={product.category}
-                      image1={product.image1}
-                      image2={product.image2}
-                      badge={product.badge}
-                    />{" "}
-                  </Link>
-                </motion.div>
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center py-24 text-center"
-            >
-              <div
-                className="p-6 rounded-full mb-4 opacity-50"
-                style={{ backgroundColor: theme.navbar.activePill }}
-              >
-                <Search size={48} />
-              </div>
-              <h3 className="text-2xl font-bold mb-2">No products found</h3>
-              <p className="opacity-60">
-                Try adjusting your filters or search query.
-              </p>
-              <button
-                onClick={() => {
-                  setActiveCategory("All");
-                  setSearchQuery("");
-                  setPriceRange({ min: 0, max: 1000 });
-                }}
-                className="mt-6 px-6 py-2 rounded-full font-bold border transition-all hover:scale-105"
-                style={{ borderColor: theme.navbar.border }}
-              >
-                Clear Filters
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+                  <Search size={48} />
+                </div>
+                <h3 className="text-2xl font-bold mb-2">No products found</h3>
+                <p className="opacity-60">
+                  Try adjusting your filters or search query.
+                </p>
+                <button
+                  onClick={() => {
+                    setActiveCategory("All");
+                    setSearchQuery("");
+                    setPriceRange({ min: 0, max: 1000 });
+                  }}
+                  className="mt-6 px-6 py-2 rounded-full font-bold border transition-all hover:scale-105"
+                  style={{ borderColor: theme.navbar.border }}
+                >
+                  Clear Filters
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
     </div>
   );
 };

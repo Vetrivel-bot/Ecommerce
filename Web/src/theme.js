@@ -1,5 +1,3 @@
-// src/theme.js
-
 export const lightTheme = {
   name: "light",
   bg: "#ffffff",
@@ -23,23 +21,32 @@ export const lightTheme = {
     modalBg: "#ffffff",
     modalOverlay: "rgba(255, 255, 255, 0.8)",
   },
-  // --- NEW CARD CONFIG ---
   card: {
-    imgBg: "rgba(243, 244, 246, 0)", // Light gray for image background
+    imgBg: "rgba(243, 244, 246, 0)",
+    bg: "rgba(255, 255, 255, 0.03)",
     border: "rgba(0, 0, 0, 0.08)",
     textPrimary: "#111827",
     textSecondary: "#6b7280",
-    btnBg: "#000000", // Black button on light theme
+    btnBg: "#000000",
     btnText: "#ffffff",
     iconBtnBg: "rgba(255, 255, 255, 0.6)",
     iconBtnColor: "#000000",
   },
-  // --- NEW BADGE CONFIG ---
   badges: {
-    new: { bg: "#2563eb", text: "#ffffff" }, // Blue
-    sale: { bg: "#dc2626", text: "#ffffff" }, // Red
-    hot: { bg: "#ea580c", text: "#ffffff" }, // Orange
-    default: { bg: "#000000", text: "#ffffff" }, // Black
+    new: { bg: "#2563eb", text: "#ffffff" },
+    sale: { bg: "#dc2626", text: "#ffffff" },
+    hot: { bg: "#ea580c", text: "#ffffff" },
+    default: { bg: "#000000", text: "#ffffff" },
+  },
+  // --- NEW SCROLLBAR CONFIG ---
+  scrollbar: {
+    track: "#f3f4f6", // Light gray track
+    border: "#e5e7eb",
+    teeth: "#374151", // Dark gray teeth for contrast
+    handleBody: "#ffffff",
+    handleStroke: "#111827",
+    handleGradientStart: "#e5e7eb",
+    handleGradientEnd: "#ffffff",
   },
 };
 
@@ -48,7 +55,6 @@ export const darkTheme = {
   bg: "#050505",
   text: "#ffffff",
   arrowBg: "#000000",
-
   navbar: {
     bg: "rgba(26, 26, 26, 0.85)",
     border: "rgba(255, 255, 255, 0.1)",
@@ -67,22 +73,31 @@ export const darkTheme = {
     modalBg: "#1a1a1a",
     modalOverlay: "rgba(0, 0, 0, 0.8)",
   },
-  // --- NEW CARD CONFIG ---
   card: {
-    imgBg: "rgba(17, 24, 39, 0)", // Dark gray (gray-900)
+    imgBg: "rgba(17, 24, 39, 0)",
+    bg: "rgba(255, 255, 255, 0.03)",
     border: "rgba(255, 255, 255, 0.1)",
     textPrimary: "#f3f4f6",
     textSecondary: "#9ca3af",
-    btnBg: "#ffffff", // White button on dark theme
+    btnBg: "#ffffff",
     btnText: "#000000",
     iconBtnBg: "rgba(0, 0, 0, 0.5)",
     iconBtnColor: "#ffffff",
   },
-  // --- NEW BADGE CONFIG ---
   badges: {
-    new: { bg: "#3b82f6", text: "#ffffff" }, // Lighter Blue
-    sale: { bg: "#ef4444", text: "#ffffff" }, // Red
-    hot: { bg: "#fbbf24", text: "#000000" }, // Amber/Yellow
-    default: { bg: "#ffffff", text: "#000000" }, // White
+    new: { bg: "#3b82f6", text: "#ffffff" },
+    sale: { bg: "#ef4444", text: "#ffffff" },
+    hot: { bg: "#fbbf24", text: "#000000" },
+    default: { bg: "#ffffff", text: "#000000" },
+  },
+  // --- NEW SCROLLBAR CONFIG ---
+  scrollbar: {
+    track: "#111111", // Very dark track
+    border: "#333333",
+    teeth: "#d1d5db", // Silver/Light gray teeth
+    handleBody: "#262626",
+    handleStroke: "#ffffff",
+    handleGradientStart: "#404040",
+    handleGradientEnd: "#171717",
   },
 };

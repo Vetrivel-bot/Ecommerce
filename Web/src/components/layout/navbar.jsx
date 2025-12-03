@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   motion,
   AnimatePresence,
@@ -26,6 +26,9 @@ const Navbar = () => {
 
   const [isRevealed, setIsRevealed] = useState(false);
 
+  // Ref to handle the hide delay
+  const hideTimeoutRef = useRef(null);
+
   const location = useLocation();
   const { scrollY } = useScroll();
 
@@ -51,16 +54,29 @@ const Navbar = () => {
     }
   }, [location]);
 
+  // --- SMOOTHER SCROLL LOGIC ---
   useMotionValueEvent(scrollY, "change", (latest) => {
     const previous = scrollY.getPrevious();
-    if (
-      latest > previous &&
-      latest > 150 &&
-      !isMobileMenuOpen &&
-      !isSearchOpen
-    ) {
-      setIsHidden(true);
-    } else {
+    const isScrollingDown = latest > previous;
+    const isScrollingUp = latest < previous;
+
+    // Logic to Hide (with delay)
+    if (isScrollingDown && latest > 150 && !isMobileMenuOpen && !isSearchOpen) {
+      // Only set the timer if we aren't already hidden and timer isn't running
+      if (!isHidden && !hideTimeoutRef.current) {
+        hideTimeoutRef.current = setTimeout(() => {
+          setIsHidden(true);
+          hideTimeoutRef.current = null;
+        }, 400); // 400ms delay to prevent jitter
+      }
+    }
+    // Logic to Reveal (Immediate)
+    else if (isScrollingUp || latest < 150) {
+      // If we start scrolling up, clear any pending hide timer immediately
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+        hideTimeoutRef.current = null;
+      }
       setIsHidden(false);
     }
   });
@@ -71,16 +87,18 @@ const Navbar = () => {
     document.body.style.overflow = isSearchOpen ? "hidden" : "unset";
   }, [isSearchOpen]);
 
+  // --- SMOOTHER ANIMATION VARIANTS ---
   const navbarVariants = {
     visible: {
       y: 0,
       opacity: 1,
-      transition: { duration: 0.3, ease: "easeOut" },
+      // Custom bezier for a premium "heavy" feel
+      transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
     },
     hidden: {
-      y: "-120%",
+      y: "-140%", // Move slightly further up to ensure shadow clears
       opacity: 0,
-      transition: { duration: 0.6, ease: "easeInOut" },
+      transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
     },
   };
 
@@ -121,53 +139,77 @@ const Navbar = () => {
                 </motion.div>
               </Link>
 
-              {/* Search Trigger - HIDDEN ON SHOP PAGE */}
-              {!isShopPage && (
-                <>
-                  {/* Desktop Search Button */}
-                  <div className="hidden md:block">
-                    <button
-                      onClick={() => setIsSearchOpen(true)}
-                      style={{
-                        backgroundColor: theme.navbar.searchBg,
-                        color: theme.navbar.searchText,
-                        borderColor: theme.navbar.searchBorder,
-                      }}
-                      className="relative group flex items-center pl-3 pr-4 py-2.5 rounded-full transition-all w-[160px] hover:w-[180px] border"
-                    >
-                      <SearchIcon
-                        className="h-4 w-4 mr-2"
-                        style={{ color: theme.navbar.iconColor }}
-                      />
-                      <span className="text-sm">Search...</span>
-                      <span
+              {/* Search Trigger - ANIMATED HIDE/SHOW ON SHOP PAGE */}
+              <AnimatePresence>
+                {!isShopPage && (
+                  <motion.div
+                    initial={{ opacity: 0, width: 0, scale: 0.8 }}
+                    animate={{
+                      opacity: 1,
+                      width: "auto",
+                      scale: 1,
+                      transition: {
+                        duration: 0.4,
+                        ease: [0.22, 1, 0.36, 1], // Snappy Entrance
+                      },
+                    }}
+                    exit={{
+                      opacity: 0,
+                      width: 0,
+                      scale: 0.8,
+                      transition: {
+                        delay: 0.2, // WAIT 0.5s before hiding
+                        duration: 1, // Then animate out smoothly
+                        ease: [0.22, 1, 0.36, 1],
+                      },
+                    }}
+                    className="flex items-center gap-3 overflow-hidden origin-left"
+                  >
+                    {/* Desktop Search Button */}
+                    <div className="hidden md:block">
+                      <button
+                        onClick={() => setIsSearchOpen(true)}
                         style={{
                           backgroundColor: theme.navbar.searchBg,
+                          color: theme.navbar.searchText,
                           borderColor: theme.navbar.searchBorder,
-                          color: theme.navbar.textIdle,
                         }}
-                        className="absolute right-3 text-xs px-1.5 py-0.5 rounded border"
+                        className="relative group flex items-center pl-3 pr-4 py-2.5 rounded-full transition-all w-[160px] hover:w-[180px] border whitespace-nowrap"
                       >
-                        Ask AI
-                      </span>
-                    </button>
-                  </div>
+                        <SearchIcon
+                          className="h-4 w-4 mr-2"
+                          style={{ color: theme.navbar.iconColor }}
+                        />
+                        <span className="text-sm">Search...</span>
+                        <span
+                          style={{
+                            backgroundColor: theme.navbar.searchBg,
+                            borderColor: theme.navbar.searchBorder,
+                            color: theme.navbar.textIdle,
+                          }}
+                          className="absolute right-3 text-xs px-1.5 py-0.5 rounded border"
+                        >
+                          Ask AI
+                        </span>
+                      </button>
+                    </div>
 
-                  {/* Mobile Search Icon (Moved near logo) */}
-                  <div className="md:hidden">
-                    <button
-                      onClick={() => setIsSearchOpen(true)}
-                      style={{
-                        backgroundColor: theme.navbar.searchBg,
-                        color: theme.navbar.iconColor,
-                      }}
-                      className="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
-                    >
-                      <SearchIcon className="h-5 w-5" />
-                    </button>
-                  </div>
-                </>
-              )}
+                    {/* Mobile Search Icon (Moved near logo) */}
+                    <div className="md:hidden">
+                      <button
+                        onClick={() => setIsSearchOpen(true)}
+                        style={{
+                          backgroundColor: theme.navbar.searchBg,
+                          color: theme.navbar.iconColor,
+                        }}
+                        className="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
+                      >
+                        <SearchIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* --- CENTER SECTION: Links (Desktop) --- */}
