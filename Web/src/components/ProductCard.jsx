@@ -1,25 +1,59 @@
-import React from "react";
-import { motion } from "framer-motion";
+import React, { useContext } from "react";
 import { ShoppingBag, Heart, Eye } from "lucide-react";
+import { ThemeContext } from "@/context/ThemeContext";
 
 const ProductCard = ({ title, price, category, image1, image2, badge }) => {
+  const { theme } = useContext(ThemeContext);
+
+  // Helper to get badge colors based on text (e.g., "New", "Sale")
+  const getBadgeStyle = (badgeText) => {
+    if (!badgeText) return {};
+    const key = badgeText.toLowerCase();
+    // Default to 'default' if the specific key (e.g. 'sale') isn't found
+    const style = theme.badges[key] || theme.badges.default;
+    return { backgroundColor: style.bg, color: style.text };
+  };
+
+  const badgeStyle = getBadgeStyle(badge);
+
   return (
     <div className="group relative w-full max-w-sm mx-auto">
       {/* --- IMAGE CONTAINER --- */}
-      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-gray-900 border border-white/10">
-        {/* Badge (New/Sale) */}
+      <div
+        className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl transition-colors duration-300"
+        style={{
+          backgroundColor: theme.card.imgBg,
+          border: `1px solid ${theme.card.border}`,
+        }}
+      >
+        {/* Badge (Dynamic Colors) */}
         {badge && (
-          <div className="absolute top-3 left-3 z-20 bg-white text-black text-xs font-bold px-2 py-1 uppercase tracking-widest rounded-sm">
+          <div
+            className="absolute top-3 left-3 z-20 text-xs font-bold px-3 py-1 uppercase tracking-widest rounded-sm shadow-sm"
+            style={badgeStyle}
+          >
             {badge}
           </div>
         )}
 
         {/* Action Icons (Top Right) */}
         <div className="absolute top-3 right-3 z-20 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <button className="p-2 bg-black/50 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-black transition-colors">
+          <button
+            className="p-2 backdrop-blur-md rounded-full transition-colors"
+            style={{
+              backgroundColor: theme.card.iconBtnBg,
+              color: theme.card.iconBtnColor,
+            }}
+          >
             <Heart size={18} />
           </button>
-          <button className="p-2 bg-black/50 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-black transition-colors">
+          <button
+            className="p-2 backdrop-blur-md rounded-full transition-colors"
+            style={{
+              backgroundColor: theme.card.iconBtnBg,
+              color: theme.card.iconBtnColor,
+            }}
+          >
             <Eye size={18} />
           </button>
         </div>
@@ -30,19 +64,27 @@ const ProductCard = ({ title, price, category, image1, image2, badge }) => {
           <img
             src={image1}
             alt={title}
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 mix-blend-overlay opacity-90"
+            // Note: mix-blend can be removed if you want pure images,
+            // but it helps blend into the theme background slightly
           />
-          {/* Secondary Image (Visible on Hover) */}
+          {/* Secondary Image */}
           <img
             src={image2}
             alt={title}
-            className="absolute inset-0 w-full h-full object-cover transition-all duration-700 opacity-0 group-hover:opacity-100 group-hover:scale-110"
+            className="absolute inset-0 w-full h-full object-cover transition-all duration-700 opacity-0 group-hover:opacity-100 group-hover:scale-110 mix-blend-overlay"
           />
         </div>
 
         {/* 'Add to Cart' Slide Up Button */}
         <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[0.19,1,0.22,1]">
-          <button className="w-full bg-white text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors shadow-lg shadow-black/50">
+          <button
+            className="w-full font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg hover:opacity-90 transition-opacity"
+            style={{
+              backgroundColor: theme.card.btnBg,
+              color: theme.card.btnText,
+            }}
+          >
             <ShoppingBag size={18} />
             Add to Cart
           </button>
@@ -52,14 +94,25 @@ const ProductCard = ({ title, price, category, image1, image2, badge }) => {
       {/* --- PRODUCT INFO --- */}
       <div className="mt-4 flex justify-between items-start">
         <div>
-          <p className="text-xs text-white/50 uppercase tracking-wider mb-1">
+          <p
+            className="text-xs uppercase tracking-wider mb-1"
+            style={{ color: theme.card.textSecondary }}
+          >
             {category}
           </p>
-          <h3 className="text-lg font-medium text-white group-hover:text-white/80 transition-colors cursor-pointer">
+          <h3
+            className="text-lg font-medium transition-colors cursor-pointer"
+            style={{ color: theme.card.textPrimary }}
+          >
             {title}
           </h3>
         </div>
-        <p className="text-lg font-semibold text-white">${price}</p>
+        <p
+          className="text-lg font-semibold"
+          style={{ color: theme.card.textPrimary }}
+        >
+          ${price}
+        </p>
       </div>
     </div>
   );

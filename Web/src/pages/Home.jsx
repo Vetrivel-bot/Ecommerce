@@ -209,10 +209,7 @@ export default function Home() {
             triggerSectionChange(sectionRef.current + 1, 1);
           } else {
             // --- LOGIC: NAVIGATE TO SHOP (With Buffer) ---
-            // Instead of immediate nav, we add to accumulator
             exitAccumulator.current += delta;
-
-            // Log for debugging if needed: console.log(exitAccumulator.current);
 
             if (exitAccumulator.current > EXIT_THRESHOLD) {
               animatingRef.current = true;
@@ -257,9 +254,10 @@ export default function Home() {
         else if (newX < contentMaxScroll) {
           // We allow scrolling into the negative buffer
           if (newX < triggerPoint) {
-            // If we hit the deep buffer, trigger change
-            // We reset X to contentMaxScroll so animation looks clean entering next section
-            updateHorizontal(contentMaxScroll);
+            // --- MODIFIED HERE ---
+            // Trigger change to Section 2
+            // AND rewind horizontal scroll to 0 (Start)
+            updateHorizontal(0);
             triggerSectionChange(2, 1);
           } else {
             // Just update X (This allows the "Empty Scroll" visual)
@@ -325,7 +323,7 @@ export default function Home() {
             initial="initial"
             animate="animate"
             exit="exit"
-            className="absolute inset-0 w-full h-full flex flex-col justify-center bg-black z-20"
+            className="absolute inset-0 w-full h-full flex flex-col justify-center z-20"
           >
             <div className="w-full px-10 mb-8 mt-5">
               <motion.h2
