@@ -142,7 +142,7 @@ const sectionVariants = {
 };
 
 // --- CAROUSEL ITEM COMPONENT ---
-const CarouselItem = ({ product, index, x }) => {
+const CarouselItem = ({ product, index, x, isClickBlockedRef }) => {
   const CARD_WIDTH = 300;
   const GAP = 32;
   const ITEM_STRIDE = CARD_WIDTH + GAP;
@@ -184,9 +184,22 @@ const CarouselItem = ({ product, index, x }) => {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         transition={{ type: "spring", stiffness: 400, damping: 17 }}
+        // IMPORTANT: Prevent default drag behavior to avoid ghost image
+        // and allow custom mouse dragging logic to work properly.
+        onDragStart={(e) => e.preventDefault()}
         className="w-full h-full block"
       >
-        <Link to={`/shop/${product.id}`} className="block w-full h-full">
+        <Link
+          to={`/shop/${product.id}`}
+          className="block w-full h-full"
+          draggable={false}
+          onClick={(e) => {
+            // If the user was dragging, prevent the navigation click.
+            if (isClickBlockedRef.current) {
+              e.preventDefault();
+            }
+          }}
+        >
           <ProductCard {...product} />
         </Link>
       </motion.div>
@@ -207,8 +220,6 @@ export default function Home() {
   const springX = useSpring(horizontalX, { stiffness: 120, damping: 20 });
 
   // --- TEXT ANIMATION ---
-  // When springX goes negative (scroll right->left), the text moves left and fades out.
-  // [0, -400] on scroll maps to [0, -300] pixels on the text.
   const textX = useTransform(springX, [0, -400], [0, -300]);
   const textOpacity = useTransform(springX, [0, -200], [1, 0]);
   const textBlur = useTransform(springX, [0, -200], [0, 20]);
@@ -222,6 +233,8 @@ export default function Home() {
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
   const isMouseDragging = useRef(false);
+  // NEW: Ref to track if a drag occurred to block clicks
+  const isClickBlocked = useRef(false);
 
   const TOTAL_SECTIONS = 3;
   const HORIZONTAL_BUFFER = 200;
@@ -305,6 +318,8 @@ export default function Home() {
       isMouseDragging.current = true;
       touchStartX.current = e.clientX;
       document.body.style.cursor = "grabbing";
+      // Reset blocking status
+      isClickBlocked.current = false;
     }
   }, []);
 
@@ -313,9 +328,15 @@ export default function Home() {
       if (!isMouseDragging.current) return;
       e.preventDefault();
       const deltaX = touchStartX.current - e.clientX;
+
       if (Math.abs(deltaX) > 0) {
         processScroll(deltaX, 1.5);
         touchStartX.current = e.clientX;
+
+        // If moved more than 5 pixels, treat as a drag and block clicks
+        if (Math.abs(deltaX) > 5 || Math.abs(xRef.current) > 5) {
+          isClickBlocked.current = true;
+        }
       }
     },
     [processScroll]
@@ -324,6 +345,12 @@ export default function Home() {
   const handleMouseUpDrag = useCallback(() => {
     isMouseDragging.current = false;
     document.body.style.cursor = "";
+
+    // Allow a small window for the click event to fire and check the flag,
+    // then reset it.
+    setTimeout(() => {
+      isClickBlocked.current = false;
+    }, 100);
   }, []);
 
   const handleWheel = useCallback(
@@ -338,15 +365,21 @@ export default function Home() {
   const handleTouchStart = useCallback((event) => {
     touchStartY.current = event.touches[0].clientY;
     touchStartX.current = event.touches[0].clientX;
+    isClickBlocked.current = false;
   }, []);
 
   const handleTouchMove = useCallback(
     (event) => {
-      event.preventDefault();
+      event.preventDefault(); // This is crucial for custom touch handling
       const deltaY = touchStartY.current - event.touches[0].clientY;
       const deltaX = touchStartX.current - event.touches[0].clientX;
 
       if (sectionRef.current === 1) {
+        // If moving significantly, block clicks on items
+        if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+          isClickBlocked.current = true;
+        }
+
         const dominantDelta =
           Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
         processScroll(dominantDelta, 2.0);
@@ -455,7 +488,7 @@ export default function Home() {
             </div>
 
             {/* Mobile Header */}
-            <div className="md:hidden w-full px-10 mb-2 mt-5 text-center relative z-30 pointer-events-none">
+            <div className="md:hidden w-full px-10 mb-10 mt-5 text-center relative z-30 pointer-events-none">
               <h2 className="text-3xl font-bold uppercase tracking-tighter">
                 Trending Now
               </h2>
@@ -484,6 +517,7 @@ export default function Home() {
                     product={product}
                     index={index}
                     x={springX}
+                    isClickBlockedRef={isClickBlocked}
                   />
                 ))}
 
