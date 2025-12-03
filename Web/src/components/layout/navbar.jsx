@@ -7,13 +7,14 @@ import {
 } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeContext } from "@/context/ThemeContext";
+import UserHeader from "./UserHeader";
 
 // --- UNIFIED ROUTES CONFIGURATION ---
 const ROUTES = [
   { name: "Shop", path: "/shop" },
-  { name: "About", path: "/about" },
-  { name: "Playground", path: "/playground" },
+  { name: "Gallery", path: "/gallery" },
   { name: "Resource", path: "/resource" },
+  { name: "About", path: "/about" },
 ];
 
 const Navbar = () => {
@@ -23,16 +24,13 @@ const Navbar = () => {
   const [isHidden, setIsHidden] = useState(false);
   const [activeTab, setActiveTab] = useState(null);
 
-  // 1. New state to track initial load reveal
   const [isRevealed, setIsRevealed] = useState(false);
 
   const location = useLocation();
   const { scrollY } = useScroll();
 
-  // Check if current route is exactly "/shop"
   const isShopPage = location.pathname === "/shop";
 
-  // 2. Effect to reveal navbar after 3 seconds (or 0.5s as per code)
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsRevealed(true);
@@ -40,7 +38,6 @@ const Navbar = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // --- Sync Active Tab with URL Path ---
   useEffect(() => {
     const currentPath = location.pathname;
     const matchingRoute = ROUTES.find((route) =>
@@ -54,7 +51,6 @@ const Navbar = () => {
     }
   }, [location]);
 
-  // Scroll Hide/Show Logic
   useMotionValueEvent(scrollY, "change", (latest) => {
     const previous = scrollY.getPrevious();
     if (
@@ -92,9 +88,7 @@ const Navbar = () => {
     <>
       <motion.div
         variants={navbarVariants}
-        // 3. Logic: If NOT revealed yet OR scroll says hidden -> hide. Otherwise -> visible.
         animate={!isRevealed || isHidden ? "hidden" : "visible"}
-        // 4. Start hidden
         initial="hidden"
         className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-[1000px]"
       >
@@ -109,23 +103,74 @@ const Navbar = () => {
           className="p-2 rounded-[30px] border overflow-hidden backdrop-blur-md transition-shadow duration-300"
         >
           <div className="flex items-center justify-between pr-2 pl-2">
-            {/* --- Left: Logo --- */}
-            <Link to="/">
-              <motion.div
-                layout="position"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                style={{
-                  backgroundColor: theme.navbar.logoBg,
-                  color: theme.navbar.logoText,
-                }}
-                className="px-6 py-2.5 rounded-full text-sm font-bold transition-colors shrink-0 z-20 cursor-pointer block"
-              >
-                ihyaet
-              </motion.div>
-            </Link>
+            {/* --- LEFT SECTION: Logo + Search (Mobile & Desktop) --- */}
+            <div className="flex items-center gap-3">
+              {/* Logo */}
+              <Link to="/">
+                <motion.div
+                  layout="position"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                    backgroundColor: theme.navbar.logoBg,
+                    color: theme.navbar.logoText,
+                  }}
+                  className="px-6 py-2.5 rounded-full text-sm font-bold transition-colors shrink-0 z-20 cursor-pointer block"
+                >
+                  ihyaet
+                </motion.div>
+              </Link>
 
-            {/* --- Center: Desktop Links --- */}
+              {/* Search Trigger - HIDDEN ON SHOP PAGE */}
+              {!isShopPage && (
+                <>
+                  {/* Desktop Search Button */}
+                  <div className="hidden md:block">
+                    <button
+                      onClick={() => setIsSearchOpen(true)}
+                      style={{
+                        backgroundColor: theme.navbar.searchBg,
+                        color: theme.navbar.searchText,
+                        borderColor: theme.navbar.searchBorder,
+                      }}
+                      className="relative group flex items-center pl-3 pr-4 py-2.5 rounded-full transition-all w-[160px] hover:w-[180px] border"
+                    >
+                      <SearchIcon
+                        className="h-4 w-4 mr-2"
+                        style={{ color: theme.navbar.iconColor }}
+                      />
+                      <span className="text-sm">Search...</span>
+                      <span
+                        style={{
+                          backgroundColor: theme.navbar.searchBg,
+                          borderColor: theme.navbar.searchBorder,
+                          color: theme.navbar.textIdle,
+                        }}
+                        className="absolute right-3 text-xs px-1.5 py-0.5 rounded border"
+                      >
+                        Ask AI
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Mobile Search Icon (Moved near logo) */}
+                  <div className="md:hidden">
+                    <button
+                      onClick={() => setIsSearchOpen(true)}
+                      style={{
+                        backgroundColor: theme.navbar.searchBg,
+                        color: theme.navbar.iconColor,
+                      }}
+                      className="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
+                    >
+                      <SearchIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* --- CENTER SECTION: Links (Desktop) --- */}
             <motion.ul
               layout="position"
               className="hidden md:flex items-center gap-2 lg:gap-2 px-4"
@@ -157,12 +202,12 @@ const Navbar = () => {
               ))}
             </motion.ul>
 
-            {/* --- Right: Desktop Actions --- */}
+            {/* --- RIGHT SECTION: Desktop (Toggle -> Cart -> Profile) --- */}
             <motion.div
               layout="position"
               className="hidden md:flex items-center gap-2"
             >
-              {/* Theme Toggle Button (Desktop) */}
+              {/* 1. Theme Toggle */}
               <button
                 onClick={toggleTheme}
                 style={{
@@ -174,64 +219,17 @@ const Navbar = () => {
                 {theme.name === "dark" ? <SunIcon /> : <MoonIcon />}
               </button>
 
-              {/* Search Trigger - HIDDEN ON SHOP PAGE */}
-              {!isShopPage && (
-                <button
-                  onClick={() => setIsSearchOpen(true)}
-                  style={{
-                    backgroundColor: theme.navbar.searchBg,
-                    color: theme.navbar.searchText,
-                    borderColor: theme.navbar.searchBorder,
-                  }}
-                  className="relative group flex items-center pl-3 pr-4 py-2.5 rounded-full transition-all w-[160px] hover:w-[180px] border"
-                >
-                  <SearchIcon
-                    className="h-4 w-4 mr-2"
-                    style={{ color: theme.navbar.iconColor }}
-                  />
-                  <span className="text-sm">Search...</span>
-                  <span
-                    style={{
-                      backgroundColor: theme.navbar.searchBg,
-                      borderColor: theme.navbar.searchBorder,
-                      color: theme.navbar.textIdle,
-                    }}
-                    className="absolute right-3 text-xs px-1.5 py-0.5 rounded border"
-                  >
-                    Ask AI
-                  </span>
-                </button>
-              )}
+              {/* 2. UserHeader (Cart + Profile) */}
+              <UserHeader theme={theme} />
             </motion.div>
 
-            {/* --- Mobile Right Section --- */}
-            <div className="md:hidden flex items-center gap-3 z-20">
-              {/* Theme Toggle (Mobile) */}
-              <button
-                onClick={toggleTheme}
-                style={{
-                  backgroundColor: theme.navbar.searchBg,
-                  color: theme.navbar.iconColor,
-                }}
-                className="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
-              >
-                {theme.name === "dark" ? <SunIcon /> : <MoonIcon />}
-              </button>
+            {/* --- RIGHT SECTION: Mobile (Cart -> Profile -> Menu) --- */}
+            {/* Note: Toggle is moved to the Mobile Menu Overview */}
+            <div className="md:hidden flex items-center gap-2 z-20">
+              {/* UserHeader (Cart + Profile) */}
+              <UserHeader theme={theme} />
 
-              {/* Mobile Search Button - HIDDEN ON SHOP PAGE */}
-              {!isShopPage && (
-                <button
-                  onClick={() => setIsSearchOpen(true)}
-                  style={{
-                    backgroundColor: theme.navbar.searchBg,
-                    color: theme.navbar.iconColor,
-                  }}
-                  className="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
-                >
-                  <SearchIcon className="h-5 w-5" />
-                </button>
-              )}
-
+              {/* Hamburger Menu */}
               <button
                 onClick={toggleMenu}
                 style={{
@@ -250,7 +248,7 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* --- Mobile Menu --- */}
+          {/* --- Mobile Menu Overview --- */}
           <AnimatePresence>
             {isMobileMenuOpen && (
               <motion.div
@@ -260,6 +258,7 @@ const Navbar = () => {
                 className="md:hidden overflow-hidden"
               >
                 <div className="p-4 flex flex-col gap-6">
+                  {/* Links */}
                   <ul className="flex flex-col gap-2 text-center">
                     {ROUTES.map((route, i) => (
                       <motion.li
@@ -287,6 +286,26 @@ const Navbar = () => {
                       </motion.li>
                     ))}
                   </ul>
+
+                  {/* Divider */}
+                  <div className="h-px w-full bg-current opacity-10"></div>
+
+                  {/* Theme Toggle (Mobile Overview) */}
+                  <div className="flex justify-center">
+                    <button
+                      onClick={toggleTheme}
+                      style={{
+                        backgroundColor: theme.navbar.searchBg,
+                        color: theme.navbar.iconColor,
+                      }}
+                      className="flex items-center gap-3 px-6 py-3 rounded-full transition-colors w-full justify-center font-medium"
+                    >
+                      {theme.name === "dark" ? <SunIcon /> : <MoonIcon />}
+                      <span>
+                        {theme.name === "dark" ? "Light Mode" : "Dark Mode"}
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -308,7 +327,6 @@ const Navbar = () => {
 };
 
 // --- SIMPLIFIED FlipLink Component ---
-// Wraps Link in motion() to allow framer-motion props + react-router navigation
 const MotionLink = motion(Link);
 
 const FlipLink = ({ children, to, onClick, theme }) => {
@@ -321,7 +339,6 @@ const FlipLink = ({ children, to, onClick, theme }) => {
       style={{ color: theme.navbar.textIdle }}
       className="relative block overflow-hidden whitespace-nowrap text-sm font-medium px-4 py-2 transition-colors duration-200 hover:text-current"
     >
-      {/* Top Text: Slides Up + Fades OUT */}
       <motion.div
         variants={{
           initial: { y: 0, opacity: 1 },
@@ -332,7 +349,6 @@ const FlipLink = ({ children, to, onClick, theme }) => {
         {children}
       </motion.div>
 
-      {/* Bottom Text: Slides Up + Fades IN + Uses Active Color */}
       <motion.div
         className="absolute inset-0 flex items-center justify-center"
         style={{ color: theme.navbar.textHover }}
@@ -461,7 +477,7 @@ const SearchOverview = ({ onClose, theme }) => {
   );
 };
 
-// --- Icons (Unchanged) ---
+// --- Icons ---
 
 const SearchIcon = ({ className, style }) => (
   <svg

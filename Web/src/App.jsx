@@ -9,6 +9,7 @@ import Navbar from "./components/layout/navbar"; // Ensure this path matches you
 import { ThemeContext } from "./context/ThemeContext";
 import ProductDisplay from "./components/ProductDisplay";
 import ScrollToTop from "./components/ScrollToTop";
+import Gallery from "./pages/Gallery";
 function App() {
   const { theme } = useContext(ThemeContext);
   useEffect(() => {
@@ -31,6 +32,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/shop" element={<Shop />} />
           <Route path="/shop/:id" element={<ProductDisplay />} />
+          <Route path="/gallery" element={<Gallery />} />
         </Routes>
       </div>
       <Footer />
