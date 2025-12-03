@@ -155,14 +155,15 @@ export default function Home() {
   const sectionRef = useRef(0);
   const animatingRef = useRef(false);
   const xRef = useRef(0);
-
-  // 1. New Ref to accumulate scroll effort at the end of the page
   const exitAccumulator = useRef(0);
 
+  // --- TOUCH & DRAG STATE ---
+  const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
+  const isMouseDragging = useRef(false);
+
   const TOTAL_SECTIONS = 3;
-  // 2. Extra horizontal buffer (pixels) before switching sections
   const HORIZONTAL_BUFFER = 400;
-  // 3. Extra vertical buffer (pixels) before navigating to /shop
   const EXIT_THRESHOLD = 250;
 
   const updateHorizontal = (val) => {
@@ -177,14 +178,13 @@ export default function Home() {
       setDirection(dir);
       setCurrentSection(nextSec);
       sectionRef.current = nextSec;
-      exitAccumulator.current = 0; // Reset accumulator on change
+      exitAccumulator.current = 0;
 
       if (nextSec === 1) {
         setTimeout(() => {
           const track = productTrackRef.current;
           const windowWidth = window.innerWidth;
           if (track) {
-            // Note: We don't subtract buffer here, we start at 0 or maxScroll
             const maxScroll = -(track.scrollWidth - windowWidth + 80);
             const startPos = dir === 1 ? 0 : maxScroll;
             updateHorizontal(startPos);
@@ -195,12 +195,10 @@ export default function Home() {
     [horizontalX]
   );
 
-  const handleScroll = useCallback(
-    (event) => {
+  // --- UNIFIED SCROLL PROCESSOR ---
+  const processScroll = useCallback(
+    (delta, sensitivity = 0.7) => {
       if (animatingRef.current) return;
-
-      const delta = event.deltaY;
-      if (Math.abs(delta) < 5) return; // Increased noise threshold
 
       // --- CASE 1: HERO (0) or FEATURED (2) ---
       if (sectionRef.current === 0 || sectionRef.current === 2) {
@@ -208,21 +206,14 @@ export default function Home() {
           if (sectionRef.current < TOTAL_SECTIONS - 1) {
             triggerSectionChange(sectionRef.current + 1, 1);
           } else {
-            // --- LOGIC: NAVIGATE TO SHOP (With Buffer) ---
-            // Instead of immediate nav, we add to accumulator
             exitAccumulator.current += delta;
-
-            // Log for debugging if needed: console.log(exitAccumulator.current);
-
             if (exitAccumulator.current > EXIT_THRESHOLD) {
               animatingRef.current = true;
               navigate("/shop");
             }
           }
         } else if (delta < 0) {
-          // Reset exit accumulator if user scrolls up
           exitAccumulator.current = 0;
-
           if (sectionRef.current > 0) {
             triggerSectionChange(sectionRef.current - 1, -1);
           }
@@ -237,12 +228,10 @@ export default function Home() {
 
         const trackWidth = track.scrollWidth;
         const windowWidth = window.innerWidth;
-        // Logic max scroll (end of list)
         const contentMaxScroll = -(trackWidth - windowWidth + 80);
-        // Actual trigger point (end of list + BUFFER)
         const triggerPoint = contentMaxScroll - HORIZONTAL_BUFFER;
 
-        let newX = xRef.current - delta * 0.7;
+        let newX = xRef.current - delta * sensitivity;
 
         // 1. SCROLL UP PAST START
         if (newX > 0) {
@@ -253,16 +242,12 @@ export default function Home() {
             updateHorizontal(newX);
           }
         }
-        // 2. SCROLL DOWN PAST END (Buffer Zone)
+        // 2. SCROLL DOWN PAST END
         else if (newX < contentMaxScroll) {
-          // We allow scrolling into the negative buffer
           if (newX < triggerPoint) {
-            // If we hit the deep buffer, trigger change
-            // We reset X to contentMaxScroll so animation looks clean entering next section
-            updateHorizontal(contentMaxScroll);
+            updateHorizontal(0); // Rewind
             triggerSectionChange(2, 1);
           } else {
-            // Just update X (This allows the "Empty Scroll" visual)
             updateHorizontal(newX);
           }
         }
@@ -275,12 +260,109 @@ export default function Home() {
     [triggerSectionChange, navigate]
   );
 
+  // --- MOUSE DRAG HANDLERS ---
+  const handleMouseDown = useCallback((e) => {
+    if (sectionRef.current === 1) {
+      isMouseDragging.current = true;
+      touchStartX.current = e.clientX;
+      document.body.style.cursor = "grabbing";
+    }
+  }, []);
+
+  const handleMouseMoveDrag = useCallback(
+    (e) => {
+      if (!isMouseDragging.current) return;
+      e.preventDefault();
+      const currentX = e.clientX;
+      const deltaX = touchStartX.current - currentX;
+      if (Math.abs(deltaX) > 0) {
+        processScroll(deltaX, 1.5);
+        touchStartX.current = currentX;
+      }
+    },
+    [processScroll]
+  );
+
+  const handleMouseUpDrag = useCallback(() => {
+    if (isMouseDragging.current) {
+      isMouseDragging.current = false;
+      document.body.style.cursor = "";
+    }
+  }, []);
+
+  // --- GLOBAL SCROLL HANDLERS ---
+  const handleWheel = useCallback(
+    (event) => {
+      // 1. Prevent default to stop browser elastic scrolling/jitter
+      event.preventDefault();
+
+      if (Math.abs(event.deltaY) < 5) return;
+      processScroll(event.deltaY, 0.7);
+    },
+    [processScroll]
+  );
+
+  const handleTouchStart = useCallback((event) => {
+    touchStartY.current = event.touches[0].clientY;
+    touchStartX.current = event.touches[0].clientX;
+  }, []);
+
+  const handleTouchMove = useCallback(
+    (event) => {
+      event.preventDefault(); // Stop native scrolling
+      const touchY = event.touches[0].clientY;
+      const touchX = event.touches[0].clientX;
+      const deltaY = touchStartY.current - touchY;
+      const deltaX = touchStartX.current - touchX;
+
+      // --- LOGIC FOR SECTION 1 (TRENDING) ---
+      if (sectionRef.current === 1) {
+        const track = productTrackRef.current;
+        const trackWidth = track ? track.scrollWidth : 0;
+        const windowWidth = window.innerWidth;
+        const contentMaxScroll = -(trackWidth - windowWidth + 80);
+
+        // A. Horizontal Swipe: Always move the slider
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 5) {
+          processScroll(deltaX, 2.0);
+          touchStartX.current = touchX;
+          touchStartY.current = touchY;
+        }
+        // B. Vertical Swipe: LOCK MOVEMENT, only trigger transition at edges
+        else if (Math.abs(deltaY) > 5) {
+          // If at START and Swiping DOWN (negative deltaY) -> Go to Prev Section
+          if (xRef.current >= 0 && deltaY < 0) {
+            processScroll(deltaY, 2.0);
+          }
+          // If at END and Swiping UP (positive deltaY) -> Go to Next Section
+          else if (xRef.current <= contentMaxScroll && deltaY > 0) {
+            processScroll(deltaY, 2.0);
+          }
+          // ELSE: Do nothing (Strictly ignore vertical swipes inside the list)
+
+          // Reset touches so delta doesn't accumulate huge values while ignored
+          touchStartY.current = touchY;
+          touchStartX.current = touchX;
+        }
+      }
+      // --- LOGIC FOR OTHER SECTIONS (Vertical Scroll) ---
+      else {
+        // Standard vertical scrolling behavior for Hero/Featured
+        if (Math.abs(deltaY) > 5) {
+          processScroll(deltaY, 2.0);
+          touchStartY.current = touchY;
+          touchStartX.current = touchX;
+        }
+      }
+    },
+    [processScroll]
+  );
+
   useEffect(() => {
     if (isAnimating) {
       const timeout = setTimeout(() => {
         setIsAnimating(false);
         animatingRef.current = false;
-        // Ensure accumulator is reset after animations finish
         exitAccumulator.current = 0;
       }, 1000);
       return () => clearTimeout(timeout);
@@ -288,9 +370,17 @@ export default function Home() {
   }, [currentSection, isAnimating]);
 
   useEffect(() => {
-    window.addEventListener("wheel", handleScroll, { passive: false });
-    return () => window.removeEventListener("wheel", handleScroll);
-  }, [handleScroll]);
+    // Note: Passive false is critical for event.preventDefault() to work
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    window.addEventListener("touchstart", handleTouchStart, { passive: false });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+
+    return () => {
+      window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, [handleWheel, handleTouchStart, handleTouchMove]);
 
   return (
     <div
@@ -325,7 +415,12 @@ export default function Home() {
             initial="initial"
             animate="animate"
             exit="exit"
-            className="absolute inset-0 w-full h-full flex flex-col justify-center bg-black z-20"
+            // Attach Mouse Drag Handlers
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMoveDrag}
+            onMouseUp={handleMouseUpDrag}
+            onMouseLeave={handleMouseUpDrag}
+            className="absolute inset-0 w-full h-full flex flex-col justify-center z-20 cursor-grab active:cursor-grabbing"
           >
             <div className="w-full px-10 mb-8 mt-5">
               <motion.h2
@@ -342,7 +437,7 @@ export default function Home() {
                 transition={{ delay: 0.5 }}
                 className="text-xl font-mono mt-2"
               >
-                &larr; Scroll Down to Explore &rarr;
+                &larr; Scroll Down (or Swipe) to Explore &rarr;
               </motion.p>
             </div>
 
@@ -361,7 +456,7 @@ export default function Home() {
                     <ProductCard {...product} />
                   </div>
                 ))}
-                {/* Visual Cue at the end - Adjusted spacing for buffer */}
+                {/* Visual Cue at the end */}
                 <div
                   className="flex-shrink-0 flex items-center justify-center opacity-50 font-mono text-xl"
                   style={{ width: "300px", paddingLeft: "50px" }}

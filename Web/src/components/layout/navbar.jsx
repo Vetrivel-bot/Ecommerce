@@ -6,7 +6,7 @@ import {
   useMotionValueEvent,
 } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
-import { ThemeContext } from "@/context/ThemeContext"; // Ensure correct path
+import { ThemeContext } from "@/context/ThemeContext";
 
 // --- UNIFIED ROUTES CONFIGURATION ---
 const ROUTES = [
@@ -29,7 +29,10 @@ const Navbar = () => {
   const location = useLocation();
   const { scrollY } = useScroll();
 
-  // 2. Effect to reveal navbar after 3 seconds
+  // Check if current route is exactly "/shop"
+  const isShopPage = location.pathname === "/shop";
+
+  // 2. Effect to reveal navbar after 3 seconds (or 0.5s as per code)
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsRevealed(true);
@@ -171,32 +174,34 @@ const Navbar = () => {
                 {theme.name === "dark" ? <SunIcon /> : <MoonIcon />}
               </button>
 
-              {/* Search Trigger */}
-              <button
-                onClick={() => setIsSearchOpen(true)}
-                style={{
-                  backgroundColor: theme.navbar.searchBg,
-                  color: theme.navbar.searchText,
-                  borderColor: theme.navbar.searchBorder,
-                }}
-                className="relative group flex items-center pl-3 pr-4 py-2.5 rounded-full transition-all w-[160px] hover:w-[180px] border"
-              >
-                <SearchIcon
-                  className="h-4 w-4 mr-2"
-                  style={{ color: theme.navbar.iconColor }}
-                />
-                <span className="text-sm">Search...</span>
-                <span
+              {/* Search Trigger - HIDDEN ON SHOP PAGE */}
+              {!isShopPage && (
+                <button
+                  onClick={() => setIsSearchOpen(true)}
                   style={{
                     backgroundColor: theme.navbar.searchBg,
+                    color: theme.navbar.searchText,
                     borderColor: theme.navbar.searchBorder,
-                    color: theme.navbar.textIdle,
                   }}
-                  className="absolute right-3 text-xs px-1.5 py-0.5 rounded border"
+                  className="relative group flex items-center pl-3 pr-4 py-2.5 rounded-full transition-all w-[160px] hover:w-[180px] border"
                 >
-                  Ask AI
-                </span>
-              </button>
+                  <SearchIcon
+                    className="h-4 w-4 mr-2"
+                    style={{ color: theme.navbar.iconColor }}
+                  />
+                  <span className="text-sm">Search...</span>
+                  <span
+                    style={{
+                      backgroundColor: theme.navbar.searchBg,
+                      borderColor: theme.navbar.searchBorder,
+                      color: theme.navbar.textIdle,
+                    }}
+                    className="absolute right-3 text-xs px-1.5 py-0.5 rounded border"
+                  >
+                    Ask AI
+                  </span>
+                </button>
+              )}
             </motion.div>
 
             {/* --- Mobile Right Section --- */}
@@ -213,16 +218,19 @@ const Navbar = () => {
                 {theme.name === "dark" ? <SunIcon /> : <MoonIcon />}
               </button>
 
-              <button
-                onClick={() => setIsSearchOpen(true)}
-                style={{
-                  backgroundColor: theme.navbar.searchBg,
-                  color: theme.navbar.iconColor,
-                }}
-                className="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
-              >
-                <SearchIcon className="h-5 w-5" />
-              </button>
+              {/* Mobile Search Button - HIDDEN ON SHOP PAGE */}
+              {!isShopPage && (
+                <button
+                  onClick={() => setIsSearchOpen(true)}
+                  style={{
+                    backgroundColor: theme.navbar.searchBg,
+                    color: theme.navbar.iconColor,
+                  }}
+                  className="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
+                >
+                  <SearchIcon className="h-5 w-5" />
+                </button>
+              )}
 
               <button
                 onClick={toggleMenu}

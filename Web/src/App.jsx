@@ -1,16 +1,23 @@
 import "./App.css";
+import { useContext, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Shop from "./pages/Shop";
+import ScrollToTop from "./components/ScrollToTop";
+import Footer from "./components/layout/footer";
 import Navbar from "./components/layout/navbar"; // Ensure this path matches your file structure
-import { ThemeProvider } from "./context/ThemeContext";
-
+import { ThemeContext } from "./context/ThemeContext";
 function App() {
+  const { theme } = useContext(ThemeContext);
+  useEffect(() => {
+    document.documentElement.style.backgroundColor = theme.bg;
+    document.body.style.backgroundColor = theme.bg;
+    document.documentElement.style.color = theme.text;
+  }, [theme]);
   return (
-    // 1. Wrap everything in ThemeProvider so the Context and Background styles apply
-    <ThemeProvider>
+    <>
       <Navbar />
-
+      <ScrollToTop />
       <div
         style={{
           paddingTop: "90px",
@@ -22,7 +29,8 @@ function App() {
           <Route path="/shop" element={<Shop />} />
         </Routes>
       </div>
-    </ThemeProvider>
+      <Footer />
+    </>
   );
 }
 
