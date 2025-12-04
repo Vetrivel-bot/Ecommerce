@@ -3,6 +3,7 @@ export const lightTheme = {
   bg: "#ffffff",
   text: "#000000",
   arrowBg: "#ffffff",
+  rememberMe: "black",
   navbar: {
     bg: "rgba(255, 255, 255, 0.85)",
     border: "rgba(0, 0, 0, 0.1)",
@@ -38,11 +39,10 @@ export const lightTheme = {
     hot: { bg: "#ea580c", text: "#ffffff" },
     default: { bg: "#000000", text: "#ffffff" },
   },
-  // --- NEW SCROLLBAR CONFIG ---
   scrollbar: {
-    track: "#f3f4f6", // Light gray track
+    track: "#f3f4f6",
     border: "#e5e7eb",
-    teeth: "#374151", // Dark gray teeth for contrast
+    teeth: "#374151",
     handleBody: "#ffffff",
     handleStroke: "#111827",
     handleGradientStart: "#e5e7eb",
@@ -55,6 +55,8 @@ export const darkTheme = {
   bg: "#050505",
   text: "#ffffff",
   arrowBg: "#000000",
+  rememberMe: "white",
+
   navbar: {
     bg: "rgba(26, 26, 26, 0.85)",
     border: "rgba(255, 255, 255, 0.1)",
@@ -90,11 +92,10 @@ export const darkTheme = {
     hot: { bg: "#fbbf24", text: "#000000" },
     default: { bg: "#ffffff", text: "#000000" },
   },
-  // --- NEW SCROLLBAR CONFIG ---
   scrollbar: {
-    track: "#111111", // Very dark track
+    track: "#111111",
     border: "#333333",
-    teeth: "#d1d5db", // Silver/Light gray teeth
+    teeth: "#d1d5db",
     handleBody: "#262626",
     handleStroke: "#ffffff",
     handleGradientStart: "#404040",
