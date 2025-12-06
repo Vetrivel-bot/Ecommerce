@@ -5,7 +5,7 @@ const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 
 //  Database imports
-const connectMongo = require("./config/ConnectMongo"); // Mongo
+const connectMongo = require("./config/connectMongo"); // Mongo
 
 const { createServer } = require("http");
 const app = express();
